@@ -16,7 +16,7 @@ namespace Dlss5Setup
     static class SetupApp
     {
         public const string AppName = "DLSS 5 Definitive";
-        public const string Version = "2.0";
+        public const string Version = "2.1";
         public const string Author = "Lagaz";
         public const string ExeName = "DLSS 5 Definitive.exe";
         public const string UninstName = "Desinstalar.exe";
@@ -28,7 +28,53 @@ namespace Dlss5Setup
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             bool uninstall = args.Any(a => a.Equals("/uninstall", StringComparison.OrdinalIgnoreCase));
-            Application.Run(uninstall ? (Form)new UninstallForm() : new SetupForm());
+            bool update = args.Any(a => a.Equals("/update", StringComparison.OrdinalIgnoreCase));
+            int waitPid = 0;
+            foreach (string a in args)
+                if (a.StartsWith("/waitpid:", StringComparison.OrdinalIgnoreCase)) int.TryParse(a.Substring(9), out waitPid);
+            Form f = uninstall ? (Form)new UninstallForm() : update ? (Form)new UpdateForm(waitPid) : new SetupForm();
+            Application.Run(f);
+        }
+
+        /// <summary>Copia o app, cria atalhos e registra em Aplicativos instalados.</summary>
+        public static void InstallTo(string target, bool desktop, Action<string, int> status)
+        {
+            status("Copiando arquivos...", 15);
+            Directory.CreateDirectory(target);
+            string exe = Path.Combine(target, ExeName);
+            Extract("app.exe", exe);
+            status("Copiando arquivos...", 45);
+            Extract("readme.txt", Path.Combine(target, "LEIA-ME.txt"));
+            string un = Path.Combine(target, UninstName);
+            if (!string.Equals(Path.GetFullPath(Application.ExecutablePath), Path.GetFullPath(un), StringComparison.OrdinalIgnoreCase))
+                File.Copy(Application.ExecutablePath, un, true);
+            // Uma instalação nunca é portable
+            string pini = Path.Combine(target, "portable.ini");
+            if (File.Exists(pini)) File.Delete(pini);
+
+            status("Criando atalhos...", 65);
+            Shortcut(StartMenuLnk, exe, "DLSS 5 Neural Rendering e Multi Frame Generation — por " + Author);
+            if (desktop) Shortcut(DesktopLnk, exe, "DLSS 5 Definitive — por " + Author);
+            else if (File.Exists(DesktopLnk)) File.Delete(DesktopLnk);
+
+            status("Registrando em Aplicativos instalados...", 85);
+            long size = 0;
+            foreach (string f in Directory.GetFiles(target)) size += new FileInfo(f).Length;
+            using (RegistryKey k = Registry.CurrentUser.CreateSubKey(RegPath))
+            {
+                k.SetValue("DisplayName", AppName);
+                k.SetValue("DisplayVersion", Version);
+                k.SetValue("Publisher", Author);
+                k.SetValue("DisplayIcon", exe + ",0");
+                k.SetValue("InstallLocation", target);
+                k.SetValue("UninstallString", "\"" + un + "\" /uninstall");
+                k.SetValue("QuietUninstallString", "\"" + un + "\" /uninstall");
+                k.SetValue("EstimatedSize", (int)(size / 1024), RegistryValueKind.DWord);
+                k.SetValue("NoModify", 1, RegistryValueKind.DWord);
+                k.SetValue("NoRepair", 1, RegistryValueKind.DWord);
+                k.SetValue("InstallDate", DateTime.Now.ToString("yyyyMMdd"));
+            }
+            status("Concluído", 100);
         }
 
         public static string DefaultDir
@@ -277,42 +323,7 @@ namespace Dlss5Setup
 
         void DoInstall(string target, bool desktop)
         {
-            Status("Copiando arquivos...", 15);
-            Directory.CreateDirectory(target);
-            string exe = Path.Combine(target, SetupApp.ExeName);
-            SetupApp.Extract("app.exe", exe);
-            Status("Copiando arquivos...", 45);
-            SetupApp.Extract("readme.txt", Path.Combine(target, "LEIA-ME.txt"));
-            string un = Path.Combine(target, SetupApp.UninstName);
-            if (!string.Equals(Path.GetFullPath(Application.ExecutablePath), Path.GetFullPath(un), StringComparison.OrdinalIgnoreCase))
-                File.Copy(Application.ExecutablePath, un, true);
-            // Uma instalação nunca é portable
-            string pini = Path.Combine(target, "portable.ini");
-            if (File.Exists(pini)) File.Delete(pini);
-
-            Status("Criando atalhos...", 65);
-            SetupApp.Shortcut(SetupApp.StartMenuLnk, exe, "DLSS 5 Neural Rendering e Multi Frame Generation — por " + SetupApp.Author);
-            if (desktop) SetupApp.Shortcut(SetupApp.DesktopLnk, exe, "DLSS 5 Definitive — por " + SetupApp.Author);
-            else if (File.Exists(SetupApp.DesktopLnk)) File.Delete(SetupApp.DesktopLnk);
-
-            Status("Registrando em Aplicativos instalados...", 85);
-            long size = 0;
-            foreach (string f in Directory.GetFiles(target)) size += new FileInfo(f).Length;
-            using (RegistryKey k = Registry.CurrentUser.CreateSubKey(SetupApp.RegPath))
-            {
-                k.SetValue("DisplayName", SetupApp.AppName);
-                k.SetValue("DisplayVersion", SetupApp.Version);
-                k.SetValue("Publisher", SetupApp.Author);
-                k.SetValue("DisplayIcon", exe + ",0");
-                k.SetValue("InstallLocation", target);
-                k.SetValue("UninstallString", "\"" + un + "\" /uninstall");
-                k.SetValue("QuietUninstallString", "\"" + un + "\" /uninstall");
-                k.SetValue("EstimatedSize", (int)(size / 1024), RegistryValueKind.DWord);
-                k.SetValue("NoModify", 1, RegistryValueKind.DWord);
-                k.SetValue("NoRepair", 1, RegistryValueKind.DWord);
-                k.SetValue("InstallDate", DateTime.Now.ToString("yyyyMMdd"));
-            }
-            Status("Concluído", 100);
+            SetupApp.InstallTo(target, desktop, Status);
         }
 
         void Finish()
@@ -329,6 +340,89 @@ namespace Dlss5Setup
                 catch { }
             }
             Close();
+        }
+    }
+
+    /// <summary>
+    /// Atualização automática chamada pelo próprio app ("Atualizar agora"): espera o app fechar, instala por cima na
+    /// mesma pasta (mantendo o atalho da Área de Trabalho só se ele já existia) e reabre o app. Sem perguntas.
+    /// </summary>
+    class UpdateForm : SetupWindow
+    {
+        readonly int waitPid;
+        Label lblStatus;
+        ThinProgress bar;
+
+        public UpdateForm(int waitPid) : base(520, 190)
+        {
+            this.waitPid = waitPid;
+            Subtitle = "Atualizando";
+            lblStatus = AddLabel(this, "Aguardando o " + SetupApp.AppName + " fechar...", 24, 104, 472, 24, Theme.F(9.5f), Theme.Text);
+            bar = new ThinProgress();
+            bar.SetBounds(24, 140, 472, 6);
+            Controls.Add(bar);
+            Shown += delegate
+            {
+                Thread t = new Thread(Run);
+                t.IsBackground = true;
+                t.Start();
+            };
+        }
+
+        void Status(string s, int pct)
+        {
+            try { BeginInvoke(new Action(delegate { lblStatus.Text = s; bar.Value = pct; })); } catch { }
+        }
+
+        void Run()
+        {
+            string dir = SetupApp.InstalledDir();
+            if (string.IsNullOrEmpty(dir)) dir = SetupApp.DefaultDir;
+            try
+            {
+                if (waitPid > 0)
+                {
+                    try { Process.GetProcessById(waitPid).WaitForExit(30000); } catch { }
+                }
+                // Outras janelas do app abertas a partir da pasta instalada também precisam fechar
+                foreach (Process p in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(SetupApp.ExeName)))
+                {
+                    try
+                    {
+                        if (!p.MainModule.FileName.StartsWith(dir, StringComparison.OrdinalIgnoreCase)) continue;
+                        p.CloseMainWindow();
+                        if (!p.WaitForExit(5000)) p.Kill();
+                    }
+                    catch { }
+                }
+                // O exe pode ficar travado alguns instantes depois que o processo termina
+                for (int i = 0; ; i++)
+                {
+                    try { SetupApp.InstallTo(dir, File.Exists(SetupApp.DesktopLnk), Status); break; }
+                    catch (IOException) { if (i >= 10) throw; Thread.Sleep(700); }
+                }
+                Status("✔ Atualizado para a versão " + SetupApp.Version + " — abrindo...", 100);
+                ProcessStartInfo psi = new ProcessStartInfo(Path.Combine(dir, SetupApp.ExeName), "/updated");
+                psi.WorkingDirectory = dir;
+                psi.UseShellExecute = true;
+                Process.Start(psi);
+                Thread.Sleep(1200);
+                BeginInvoke(new Action(Close));
+            }
+            catch (Exception ex)
+            {
+                try
+                {
+                    BeginInvoke(new Action(delegate
+                    {
+                        lblStatus.ForeColor = Theme.Danger;
+                        lblStatus.Text = "Erro: " + ex.Message;
+                        MessageBox.Show(this, "Não foi possível atualizar:\r\n" + ex.Message, SetupApp.AppName, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        Close();
+                    }));
+                }
+                catch { }
+            }
         }
     }
 

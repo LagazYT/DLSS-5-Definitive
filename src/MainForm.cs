@@ -62,7 +62,17 @@ namespace Dlss5Injector
         static readonly GfxApi[] ApiChoices = { GfxApi.Unknown, GfxApi.DX12, GfxApi.DX11, GfxApi.Vulkan, GfxApi.DX10, GfxApi.DX9 };
         const int PageTop = 76;
 
-        public MainForm(string initialFolder)
+        // ---- atualização automática
+        Panel banner;
+        Label lblBanner;
+        ModernButton btnUpdate, btnNotes, btnDismiss, btnVersion;
+        UpdateInfo pendingUpdate;
+        System.Windows.Forms.Timer updTimer;
+        bool checkingUpdate, updating;
+
+        public MainForm(string initialFolder) : this(initialFolder, false) { }
+
+        public MainForm(string initialFolder, bool justUpdated)
         {
             SuspendLayout();
             AutoScaleDimensions = new SizeF(96F, 96F);
@@ -91,6 +101,7 @@ namespace Dlss5Injector
             BuildLibrary();
             BuildInjector();
             BuildFrameGen();
+            BuildUpdateUi();
             ShowPage(0);
             ResumeLayout(false);
 
@@ -117,8 +128,164 @@ namespace Dlss5Injector
                     SetFolder(initialFolder, null);
                 }
                 StartScan(null);
+                if (justUpdated)
+                    ShowBanner("✔  DLSS 5 Definitive atualizado para a versão " + Program.Version + ".", false);
+                // Verifica atualizações alguns segundos depois de abrir e depois a cada 6 horas
+                updTimer = new System.Windows.Forms.Timer();
+                updTimer.Interval = 4000;
+                updTimer.Tick += delegate { updTimer.Interval = 6 * 60 * 60 * 1000; CheckForUpdates(false); };
+                updTimer.Start();
             };
             FormClosing += delegate { if (scanner != null) scanner.Cancel = true; LibraryStore.Save(games); };
+        }
+
+        // ================================================================ ATUALIZAÇÃO
+
+        void BuildUpdateUi()
+        {
+            btnVersion = new ModernButton("v" + Program.Version + "  ·  atualizações", null, ButtonKind.Ghost);
+            btnVersion.Font = Theme.F(8f);
+            btnVersion.SetBounds(178, 40, 132, 22);
+            btnVersion.Click += delegate { if (pendingUpdate != null) DoUpdate(); else CheckForUpdates(true); };
+            Controls.Add(btnVersion);
+
+            banner = new Panel();
+            banner.SetBounds(0, PageTop, 1120, 48);
+            banner.BackColor = Theme.AccentDark;
+            banner.Visible = false;
+            Controls.Add(banner);
+            lblBanner = TextLabel(banner, "", 24, 0, 600, 48, Theme.F(10f, FontStyle.Bold), Theme.AccentHover);
+            lblBanner.TextAlign = ContentAlignment.MiddleLeft;
+            btnNotes = new ModernButton("Novidades", null, ButtonKind.Ghost);
+            btnNotes.SetBounds(690, 9, 110, 30);
+            btnNotes.Click += delegate { if (pendingUpdate != null) Process.Start(pendingUpdate.PageUrl); };
+            banner.Controls.Add(btnNotes);
+            btnUpdate = new ModernButton("  Atualizar agora", Theme.GDownload, ButtonKind.Primary);
+            btnUpdate.Font = Theme.F(9.5f, FontStyle.Bold);
+            btnUpdate.SetBounds(810, 7, 230, 34);
+            btnUpdate.Click += delegate { DoUpdate(); };
+            banner.Controls.Add(btnUpdate);
+            btnDismiss = new ModernButton("✕", null, ButtonKind.Ghost);
+            btnDismiss.SetBounds(1052, 9, 44, 30);
+            btnDismiss.Click += delegate { if (!updating) HideBanner(); };
+            banner.Controls.Add(btnDismiss);
+        }
+
+        void ShowBanner(string text, bool update)
+        {
+            lblBanner.Text = text;
+            btnUpdate.Visible = btnNotes.Visible = update;
+            if (!banner.Visible)
+            {
+                int h = banner.Height;
+                banner.Top = pageLib.Top;
+                foreach (Panel p in new[] { pageLib, pageInj, pageFg }) p.Top += h;
+                ClientSize = new Size(ClientSize.Width, ClientSize.Height + h);
+                banner.Visible = true;
+                banner.BringToFront();
+            }
+            if (!update)
+            {
+                // Aviso informativo some sozinho
+                System.Windows.Forms.Timer t = new System.Windows.Forms.Timer();
+                t.Interval = 9000;
+                t.Tick += delegate { t.Stop(); t.Dispose(); if (pendingUpdate == null) HideBanner(); };
+                t.Start();
+            }
+        }
+
+        void HideBanner()
+        {
+            if (!banner.Visible) return;
+            int h = banner.Height;
+            banner.Visible = false;
+            foreach (Panel p in new[] { pageLib, pageInj, pageFg }) p.Top -= h;
+            ClientSize = new Size(ClientSize.Width, ClientSize.Height - h);
+        }
+
+        void CheckForUpdates(bool manual)
+        {
+            if (checkingUpdate || updating) return;
+            checkingUpdate = true;
+            if (manual) btnVersion.Text = "verificando...";
+            Thread t = new Thread(delegate()
+            {
+                UpdateInfo info = null;
+                Exception err = null;
+                try { info = Updater.Check(); } catch (Exception ex) { err = ex; }
+                SafeInvoke(delegate
+                {
+                    checkingUpdate = false;
+                    if (info != null)
+                    {
+                        pendingUpdate = info;
+                        btnVersion.Text = "v" + Program.Version + "  →  " + info.Tag;
+                        btnVersion.ForeColor = Theme.Warn;
+                        ShowBanner("⬆  Nova versão " + info.Tag + " do DLSS 5 Definitive disponível  (você tem a " + Program.Version + ")", true);
+                        return;
+                    }
+                    btnVersion.Text = "v" + Program.Version + "  ·  atualizações";
+                    if (!manual) return;
+                    if (err != null)
+                        MessageBox.Show(this, "Não foi possível verificar atualizações:\r\n" + err.Message, Program.AppName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    else
+                        MessageBox.Show(this, "Você já está na versão mais recente (" + Program.Version + ").", Program.AppName, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                });
+            });
+            t.IsBackground = true;
+            t.Start();
+        }
+
+        void DoUpdate()
+        {
+            UpdateInfo u = pendingUpdate;
+            if (u == null || updating) return;
+            if (busy)
+            {
+                MessageBox.Show(this, "Espere terminar a instalação/análise em andamento e clique em Atualizar de novo.", Program.AppName);
+                return;
+            }
+            string notes = Updater.PlainNotes(u.Notes, 700);
+            if (MessageBox.Show(this, "Atualizar o DLSS 5 Definitive de " + Program.Version + " para " + u.Tag + "?\r\n\r\n" +
+                    (notes.Length > 0 ? notes + "\r\n\r\n" : "") +
+                    "O app baixa a versão nova, confere o SHA-256, fecha e abre de novo sozinho. Suas configurações e a biblioteca são mantidas.",
+                    Program.AppName, MessageBoxButtons.OKCancel, MessageBoxIcon.Information) != DialogResult.OK) return;
+            updating = true;
+            btnUpdate.Enabled = btnDismiss.Enabled = btnNotes.Enabled = false;
+            btnUpdate.Text = "  Baixando...";
+            Thread t = new Thread(delegate()
+            {
+                string file = null;
+                Exception err = null;
+                try
+                {
+                    file = Updater.Download(u, delegate(int pct) { SafeInvoke(delegate { btnUpdate.Text = "  Baixando " + pct + "%"; }); });
+                }
+                catch (Exception ex) { err = ex; }
+                SafeInvoke(delegate
+                {
+                    if (err == null)
+                    {
+                        try
+                        {
+                            btnUpdate.Text = "  Instalando...";
+                            if (scanner != null) scanner.Cancel = true;
+                            LibraryStore.Save(games);
+                            Updater.ApplyAndRestart(file);
+                            Application.Exit();
+                            return;
+                        }
+                        catch (Exception ex) { err = ex; }
+                    }
+                    updating = false;
+                    btnUpdate.Enabled = btnDismiss.Enabled = btnNotes.Enabled = true;
+                    btnUpdate.Text = "  Atualizar agora";
+                    MessageBox.Show(this, "A atualização falhou:\r\n" + err.Message + "\r\n\r\nVocê pode baixar a versão nova manualmente em \"Novidades\".",
+                        Program.AppName, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                });
+            });
+            t.IsBackground = true;
+            t.Start();
         }
 
         protected override void OnHandleCreated(EventArgs e)

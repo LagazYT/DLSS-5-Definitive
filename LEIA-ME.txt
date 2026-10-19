@@ -9,6 +9,10 @@ Instalador e portable
   (o app baixa OptiScaler, Streamline oficial da NVIDIA etc. e confere os hashes).
   O nvngx_dlssnr.dll (runtime do DLSS 5) não vai junto: em outro PC, coloque-o em Downloads ou escolha em Alterar.
 
+Atualizações
+  O app verifica novas versões no GitHub ao abrir e a cada 6 horas (ou clique na versão, no topo).
+  Quando houver, clique em "Atualizar agora": ele baixa, confere o SHA-256, atualiza e reabre sozinho.
+
 Abas
   Biblioteca     Encontra sozinho os jogos do PC (Steam, Epic, GOG, Ubisoft, EA, Xbox e pastas
                  "Games"/"Jogos" de todos os discos) com a capa de cada jogo. "Adicionar pasta"

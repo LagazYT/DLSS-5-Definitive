@@ -10,7 +10,7 @@ namespace Dlss5Injector
     {
         public const string AppName = "DLSS 5 Definitive";
         public const string Author = "Lagaz";
-        public const string Version = "2.0";
+        public const string Version = "2.1";
 
         [STAThread]
         static void Main(string[] args)
@@ -25,7 +25,21 @@ namespace Dlss5Injector
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new MainForm(args.Length > 0 ? args[0] : null));
+            bool updated = Array.Exists(args, a => a.Equals("/updated", StringComparison.OrdinalIgnoreCase));
+            string folder = Array.Find(args, a => !a.StartsWith("/"));
+            Updater.CleanupAfterUpdate();
+            if (Array.Exists(args, a => a.Equals("/update-now", StringComparison.OrdinalIgnoreCase)))
+            {
+                // Atualização sem interface (para scripts): verifica, baixa, aplica e reabre o app atualizado.
+                try
+                {
+                    UpdateInfo u = Updater.Check();
+                    if (u != null) Updater.ApplyAndRestart(Updater.Download(u, delegate(int p) { }));
+                }
+                catch (Exception ex) { Report(ex, false); }
+                return;
+            }
+            Application.Run(new MainForm(folder, updated));
         }
 
         public static string CrashLog { get { return Path.Combine(AppPaths.Root, "crash.log"); } }

@@ -17,6 +17,16 @@ Na página de [**Releases**](../../releases/latest):
 
 > O Windows SmartScreen pode avisar "O Windows protegeu o computador", porque os executáveis não têm assinatura digital paga. Clique em **Mais informações → Executar assim mesmo**.
 
+## Atualizações automáticas
+
+O app verifica as [Releases](../../releases) deste repositório ao abrir e a cada 6 horas. Também dá para verificar na hora clicando na versão (`v2.1 · atualizações`), no cabeçalho. Quando sai uma versão nova, aparece uma faixa com o botão **Atualizar agora**. O app então:
+
+1. baixa o arquivo certo: o Setup, se estiver instalado, ou o Portable;
+2. confere o SHA-256 publicado pelo GitHub;
+3. aplica a atualização e reabre sozinho, mantendo configurações e biblioteca.
+
+Para atualizar por script: `"DLSS 5 Definitive.exe" /update-now`.
+
 ## O que ele faz
 
 ### Biblioteca
