@@ -25,6 +25,7 @@ namespace Dlss5Setup
         [STAThread]
         static void Main(string[] args)
         {
+            L.Init();
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             bool uninstall = args.Any(a => a.Equals("/uninstall", StringComparison.OrdinalIgnoreCase));
@@ -39,11 +40,11 @@ namespace Dlss5Setup
         /// <summary>Copia o app, cria atalhos e registra em Aplicativos instalados.</summary>
         public static void InstallTo(string target, bool desktop, Action<string, int> status)
         {
-            status("Copiando arquivos...", 15);
+            status(L.T("Copiando arquivos..."), 15);
             Directory.CreateDirectory(target);
             string exe = Path.Combine(target, ExeName);
             Extract("app.exe", exe);
-            status("Copiando arquivos...", 45);
+            status(L.T("Copiando arquivos..."), 45);
             Extract("readme.txt", Path.Combine(target, "LEIA-ME.txt"));
             string un = Path.Combine(target, UninstName);
             if (!string.Equals(Path.GetFullPath(Application.ExecutablePath), Path.GetFullPath(un), StringComparison.OrdinalIgnoreCase))
@@ -52,12 +53,12 @@ namespace Dlss5Setup
             string pini = Path.Combine(target, "portable.ini");
             if (File.Exists(pini)) File.Delete(pini);
 
-            status("Criando atalhos...", 65);
+            status(L.T("Criando atalhos..."), 65);
             Shortcut(StartMenuLnk, exe, "DLSS 5 Neural Rendering e Multi Frame Generation — por " + Author);
             if (desktop) Shortcut(DesktopLnk, exe, "DLSS 5 Definitive — por " + Author);
             else if (File.Exists(DesktopLnk)) File.Delete(DesktopLnk);
 
-            status("Registrando em Aplicativos instalados...", 85);
+            status(L.T("Registrando em Aplicativos instalados..."), 85);
             long size = 0;
             foreach (string f in Directory.GetFiles(target)) size += new FileInfo(f).Length;
             using (RegistryKey k = Registry.CurrentUser.CreateSubKey(RegPath))
@@ -74,7 +75,7 @@ namespace Dlss5Setup
                 k.SetValue("NoRepair", 1, RegistryValueKind.DWord);
                 k.SetValue("InstallDate", DateTime.Now.ToString("yyyyMMdd"));
             }
-            status("Concluído", 100);
+            status(L.T("Concluído"), 100);
         }
 
         public static string DefaultDir
@@ -119,7 +120,7 @@ namespace Dlss5Setup
                 .Where(p => { try { return p.MainModule.FileName.StartsWith(dir, StringComparison.OrdinalIgnoreCase); } catch { return false; } })
                 .ToArray();
             if (ps.Length == 0) return true;
-            if (MessageBox.Show(owner, "O " + AppName + " está aberto. Fechar o programa para continuar?", AppName,
+            if (MessageBox.Show(owner, L.T("O ") + AppName + L.T(" está aberto. Fechar o programa para continuar?"), AppName,
                     MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return false;
             foreach (Process p in ps)
             {
@@ -186,7 +187,7 @@ namespace Dlss5Setup
             using (Font f = Theme.F(9f))
             using (Font fb = Theme.F(9f, FontStyle.Bold))
             {
-                string s = Subtitle + "  ·  versão " + SetupApp.Version + "  ·  criado por ";
+                string s = Subtitle + L.T("  ·  versão ") + SetupApp.Version + L.T("  ·  criado por ");
                 Theme.Draw(g, s, f, Theme.Muted, new Rectangle(91, 50, 400, 22), TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
                 int w = TextRenderer.MeasureText(s, f).Width;
                 Theme.Draw(g, SetupApp.Author, fb, Theme.Accent, new Rectangle(85 + w, 50, 100, 22), TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
@@ -217,29 +218,29 @@ namespace Dlss5Setup
 
         public SetupForm() : base(600, 420)
         {
-            Subtitle = "Instalador";
+            Subtitle = L.T("Instalador");
             string prev = SetupApp.InstalledDir();
             dir = !string.IsNullOrEmpty(prev) ? prev : SetupApp.DefaultDir;
             bool update = !string.IsNullOrEmpty(prev) && File.Exists(Path.Combine(prev, SetupApp.ExeName));
 
-            Card c = new Card(null, update ? "Atualizar instalação" : "Instalar no computador");
+            Card c = new Card(null, update ? L.T("Atualizar instalação") : L.T("Instalar no computador"));
             c.SetBounds(24, 96, 552, 212);
             Controls.Add(c);
-            Place(c, new FieldLabel("Pasta de instalação"), 18, 48);
+            Place(c, new FieldLabel(L.T("Pasta de instalação")), 18, 48);
             lblDir = AddLabel(c, dir, 18, 70, 420, 34, Theme.F(9f), Theme.Text);
             lblDir.AutoEllipsis = true;
             lblDir.TextAlign = ContentAlignment.MiddleLeft;
-            btnDir = new ModernButton("Alterar", null, ButtonKind.Ghost);
+            btnDir = new ModernButton(L.T("Alterar"), null, ButtonKind.Ghost);
             btnDir.SetBounds(450, 72, 84, 30);
             btnDir.Click += delegate { ChooseDir(); };
             c.Controls.Add(btnDir);
-            tgDesktop = new ToggleSwitch("Criar atalho na Área de Trabalho", true);
+            tgDesktop = new ToggleSwitch(L.T("Criar atalho na Área de Trabalho"), true);
             tgDesktop.SetBounds(18, 114, 500, 30);
             c.Controls.Add(tgDesktop);
-            tgLaunch = new ToggleSwitch("Abrir o " + SetupApp.AppName + " ao terminar", true);
+            tgLaunch = new ToggleSwitch(L.T("Abrir o ") + SetupApp.AppName + L.T(" ao terminar"), true);
             tgLaunch.SetBounds(18, 146, 500, 30);
             c.Controls.Add(tgLaunch);
-            AddLabel(c, "Não precisa de administrador · Windows 10/11 64-bit · atalho no Menu Iniciar · desinstalador incluso",
+            AddLabel(c, L.T("Não precisa de administrador · Windows 10/11 64-bit · atalho no Menu Iniciar · desinstalador incluso"),
                 18, 182, 520, 20, Theme.F(8f), Theme.Dim);
 
             lblStatus = AddLabel(this, "", 24, 318, 552, 22, Theme.F(9f), Theme.Muted);
@@ -247,11 +248,11 @@ namespace Dlss5Setup
             bar.SetBounds(24, 344, 552, 6);
             Controls.Add(bar);
 
-            btnInstall = new ModernButton(update ? "  Atualizar" : "  Instalar", Theme.GDownload, ButtonKind.Primary);
+            btnInstall = new ModernButton(update ? L.T("  Atualizar") : L.T("  Instalar"), Theme.GDownload, ButtonKind.Primary);
             btnInstall.SetBounds(376, 360, 200, 46);
             btnInstall.Click += delegate { if (done) Finish(); else Install(); };
             Controls.Add(btnInstall);
-            btnCancel = new ModernButton("Cancelar", null, ButtonKind.Secondary);
+            btnCancel = new ModernButton(L.T("Cancelar"), null, ButtonKind.Secondary);
             btnCancel.SetBounds(254, 360, 110, 46);
             btnCancel.Click += delegate { Close(); };
             Controls.Add(btnCancel);
@@ -268,7 +269,7 @@ namespace Dlss5Setup
         {
             using (FolderBrowserDialog d = new FolderBrowserDialog())
             {
-                d.Description = "Escolha onde instalar (uma pasta \"" + SetupApp.AppName + "\" será criada dentro dela)";
+                d.Description = L.T("Escolha onde instalar (uma pasta \"") + SetupApp.AppName + L.T("\" será criada dentro dela)");
                 if (d.ShowDialog(this) != DialogResult.OK) return;
                 string p = d.SelectedPath;
                 if (!Path.GetFileName(p.TrimEnd('\\')).Equals(SetupApp.AppName, StringComparison.OrdinalIgnoreCase))
@@ -296,9 +297,9 @@ namespace Dlss5Setup
                     if (err != null)
                     {
                         lblStatus.ForeColor = Theme.Danger;
-                        lblStatus.Text = "Erro: " + err.Message;
+                        lblStatus.Text = L.T("Erro: ") + err.Message;
                         btnInstall.Enabled = btnCancel.Enabled = btnDir.Enabled = true;
-                        MessageBox.Show(this, err.Message + (err is UnauthorizedAccessException ? "\r\n\r\nEscolha uma pasta sua (ex.: a padrão) ou execute como administrador." : ""),
+                        MessageBox.Show(this, err.Message + (err is UnauthorizedAccessException ? L.T("\r\n\r\nEscolha uma pasta sua (ex.: a padrão) ou execute como administrador.") : ""),
                             SetupApp.AppName, MessageBoxButtons.OK, MessageBoxIcon.Error);
                         return;
                     }
@@ -306,7 +307,7 @@ namespace Dlss5Setup
                     bar.Value = 100;
                     lblStatus.ForeColor = Theme.Accent;
                     lblStatus.Text = "✔ " + SetupApp.AppName + " instalado em " + target;
-                    btnInstall.Text = "  Concluir";
+                    btnInstall.Text = L.T("  Concluir");
                     btnInstall.Glyph = Theme.GCheck;
                     btnInstall.Enabled = true;
                     btnInstall.Invalidate();
@@ -356,7 +357,7 @@ namespace Dlss5Setup
         public UpdateForm(int waitPid) : base(520, 190)
         {
             this.waitPid = waitPid;
-            Subtitle = "Atualizando";
+            Subtitle = L.T("Atualizando");
             lblStatus = AddLabel(this, "Aguardando o " + SetupApp.AppName + " fechar...", 24, 104, 472, 24, Theme.F(9.5f), Theme.Text);
             bar = new ThinProgress();
             bar.SetBounds(24, 140, 472, 6);
@@ -401,7 +402,7 @@ namespace Dlss5Setup
                     try { SetupApp.InstallTo(dir, File.Exists(SetupApp.DesktopLnk), Status); break; }
                     catch (IOException) { if (i >= 10) throw; Thread.Sleep(700); }
                 }
-                Status("✔ Atualizado para a versão " + SetupApp.Version + " — abrindo...", 100);
+                Status(L.T("✔ Atualizado para a versão ") + SetupApp.Version + L.T(" — abrindo..."), 100);
                 ProcessStartInfo psi = new ProcessStartInfo(Path.Combine(dir, SetupApp.ExeName), "/updated");
                 psi.WorkingDirectory = dir;
                 psi.UseShellExecute = true;
@@ -416,8 +417,8 @@ namespace Dlss5Setup
                     BeginInvoke(new Action(delegate
                     {
                         lblStatus.ForeColor = Theme.Danger;
-                        lblStatus.Text = "Erro: " + ex.Message;
-                        MessageBox.Show(this, "Não foi possível atualizar:\r\n" + ex.Message, SetupApp.AppName, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        lblStatus.Text = L.T("Erro: ") + ex.Message;
+                        MessageBox.Show(this, L.T("Não foi possível atualizar:\r\n") + ex.Message, SetupApp.AppName, MessageBoxButtons.OK, MessageBoxIcon.Error);
                         Close();
                     }));
                 }
@@ -435,24 +436,24 @@ namespace Dlss5Setup
 
         public UninstallForm() : base(600, 360)
         {
-            Subtitle = "Desinstalar";
-            Card c = new Card(null, "Remover do computador");
+            Subtitle = L.T("Desinstalar");
+            Card c = new Card(null, L.T("Remover do computador"));
             c.SetBounds(24, 96, 552, 176);
             Controls.Add(c);
-            AddLabel(c, "Remove o programa, os atalhos e a entrada em Aplicativos instalados.\r\n" +
-                        "Os jogos em que você instalou o DLSS 5 não são alterados — para restaurá-los, use \"Remover\" no app antes.",
+            AddLabel(c, L.T("Remove o programa, os atalhos e a entrada em Aplicativos instalados.\r\n") +
+                        L.T("Os jogos em que você instalou o DLSS 5 não são alterados — para restaurá-los, use \"Remover\" no app antes."),
                 18, 46, 520, 52, Theme.F(9f), Theme.Muted);
-            tgData = new ToggleSwitch("Apagar também configurações, biblioteca, capas e downloads", false);
+            tgData = new ToggleSwitch(L.T("Apagar também configurações, biblioteca, capas e downloads"), false);
             tgData.SetBounds(18, 104, 520, 30);
             c.Controls.Add(tgData);
             AddLabel(c, SetupApp.DataDir, 66, 134, 470, 20, Theme.F(8f), Theme.Dim);
 
             lblStatus = AddLabel(this, "", 24, 284, 552, 22, Theme.F(9f), Theme.Muted);
-            btnGo = new ModernButton("  Desinstalar", Theme.GDelete, ButtonKind.Primary);
+            btnGo = new ModernButton(L.T("  Desinstalar"), Theme.GDelete, ButtonKind.Primary);
             btnGo.SetBounds(376, 300, 200, 46);
             btnGo.Click += delegate { if (done) Close(); else Uninstall(); };
             Controls.Add(btnGo);
-            btnCancel = new ModernButton("Cancelar", null, ButtonKind.Secondary);
+            btnCancel = new ModernButton(L.T("Cancelar"), null, ButtonKind.Secondary);
             btnCancel.SetBounds(254, 300, 110, 46);
             btnCancel.Click += delegate { Close(); };
             Controls.Add(btnCancel);
@@ -478,7 +479,7 @@ namespace Dlss5Setup
                 done = true;
                 lblStatus.ForeColor = Theme.Accent;
                 lblStatus.Text = "✔ " + SetupApp.AppName + " foi removido.";
-                btnGo.Text = "  Fechar";
+                btnGo.Text = L.T("  Fechar");
                 btnGo.Glyph = Theme.GCheck;
                 btnGo.Invalidate();
                 btnCancel.Visible = false;
@@ -486,7 +487,7 @@ namespace Dlss5Setup
             catch (Exception ex)
             {
                 lblStatus.ForeColor = Theme.Danger;
-                lblStatus.Text = "Erro: " + ex.Message;
+                lblStatus.Text = L.T("Erro: ") + ex.Message;
             }
         }
 

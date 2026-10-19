@@ -142,7 +142,7 @@ namespace Dlss5Injector
         public GfxApi Api = GfxApi.Unknown;
         public string ApiSource = "";
         public List<string> ApiNotes = new List<string>();
-        public string Engine = "Genérica / desconhecida";
+        public string Engine = L.T("Genérica / desconhecida");
         public bool HasDlss, HasDlssD, HasDlssG, HasStreamline, HasFsr, HasXess;
         public List<string> DlssDlls = new List<string>();
         public string AntiCheat;
@@ -276,7 +276,7 @@ namespace Dlss5Injector
                 g.Engine = ue5 ? "Unreal Engine 5" : (s.Contains("++ue4+") ? "Unreal Engine 4" : "Unreal Engine");
             }
             else if (unity) g.Engine = "Unity";
-            else if (reEngine) g.Engine = "RE Engine";
+            else if (reEngine) g.Engine = L.T("RE Engine");
 
             // ---------- API ----------
             GfxApi fromLog = GfxApi.Unknown;
@@ -316,8 +316,8 @@ namespace Dlss5Injector
             if (fromLog != GfxApi.Unknown) { g.Api = fromLog; g.ApiSource = logSrc; }
             else if (unreal)
             {
-                if (ue5 || agility || (i12 && !i11)) { g.Api = GfxApi.DX12; g.ApiSource = ue5 ? "Unreal Engine 5 (padrão DX12)" : "Unreal + Agility SDK/D3D12"; }
-                else { g.Api = GfxApi.DX11; g.ApiSource = "Unreal Engine 4 (padrão DX11)"; g.ApiNotes.Add("Jogos UE4 às vezes têm modo DX12 (-dx12). Se você usa DX12 no jogo, escolha DX12 manualmente."); }
+                if (ue5 || agility || (i12 && !i11)) { g.Api = GfxApi.DX12; g.ApiSource = ue5 ? L.T("Unreal Engine 5 (padrão DX12)") : L.T("Unreal + Agility SDK/D3D12"); }
+                else { g.Api = GfxApi.DX11; g.ApiSource = L.T("Unreal Engine 4 (padrão DX11)"); g.ApiNotes.Add(L.T("Jogos UE4 às vezes têm modo DX12 (-dx12). Se você usa DX12 no jogo, escolha DX12 manualmente.")); }
             }
             else if (unity)
             {
@@ -325,18 +325,18 @@ namespace Dlss5Injector
                 if (agility) { g.Api = GfxApi.DX12; g.ApiSource = "Unity + Agility SDK (D3D12)"; }
                 else
                 {
-                    g.Api = GfxApi.DX11; g.ApiSource = "Unity (padrão no Windows: DX11)";
-                    g.ApiNotes.Add("Sem Player.log para confirmar. Se o jogo roda em DX12 (opção do jogo ou -force-d3d12), escolha DX12 manualmente. Rodar o jogo uma vez melhora a detecção.");
+                    g.Api = GfxApi.DX11; g.ApiSource = L.T("Unity (padrão no Windows: DX11)");
+                    g.ApiNotes.Add(L.T("Sem Player.log para confirmar. Se o jogo roda em DX12 (opção do jogo ou -force-d3d12), escolha DX12 manualmente. Rodar o jogo uma vez melhora a detecção."));
                 }
             }
-            else if (i12) { g.Api = GfxApi.DX12; g.ApiSource = "importa d3d12.dll"; if (i11) g.ApiNotes.Add("O executável também importa d3d11.dll (pode ter modo DX11)."); }
+            else if (i12) { g.Api = GfxApi.DX12; g.ApiSource = L.T("importa d3d12.dll"); if (i11) g.ApiNotes.Add(L.T("O executável também importa d3d11.dll (pode ter modo DX11).")); }
             else if (agility) { g.Api = GfxApi.DX12; g.ApiSource = "Agility SDK (D3D12\\D3D12Core.dll)"; }
             else if (ivk && !i11 && !i10 && !i9) { g.Api = GfxApi.Vulkan; g.ApiSource = "importa vulkan-1.dll"; }
             else if (i11)
             {
                 g.Api = GfxApi.DX11; g.ApiSource = "importa d3d11.dll";
-                if (ivk) g.ApiNotes.Add("Também importa vulkan-1.dll (pode ter modo Vulkan).");
-                if (Pe.ScanStrings(exe, new[] { "d3d12.dll" }, 400L << 20).Count > 0) g.ApiNotes.Add("O executável referencia d3d12.dll (pode ter modo DX12).");
+                if (ivk) g.ApiNotes.Add(L.T("Também importa vulkan-1.dll (pode ter modo Vulkan)."));
+                if (Pe.ScanStrings(exe, new[] { "d3d12.dll" }, 400L << 20).Count > 0) g.ApiNotes.Add(L.T("O executável referencia d3d12.dll (pode ter modo DX12)."));
             }
             else if (i10) { g.Api = GfxApi.DX10; g.ApiSource = "importa d3d10.dll"; }
             else if (i9) { g.Api = GfxApi.DX9; g.ApiSource = "importa d3d9.dll"; }
@@ -355,13 +355,13 @@ namespace Dlss5Injector
                     }
                     catch { }
                 }
-                if (s.Contains("d3d12.dll")) { g.Api = GfxApi.DX12; g.ApiSource = "referência a d3d12.dll no executável"; }
-                else if (s.Contains("vulkan-1.dll") && !s.Contains("d3d11.dll")) { g.Api = GfxApi.Vulkan; g.ApiSource = "referência a vulkan-1.dll"; }
-                else if (s.Contains("d3d11.dll")) { g.Api = GfxApi.DX11; g.ApiSource = "referência a d3d11.dll"; }
-                else if (s.Contains("d3d10.dll")) { g.Api = GfxApi.DX10; g.ApiSource = "referência a d3d10.dll"; }
-                else if (s.Contains("d3d9.dll")) { g.Api = GfxApi.DX9; g.ApiSource = "referência a d3d9.dll"; }
+                if (s.Contains("d3d12.dll")) { g.Api = GfxApi.DX12; g.ApiSource = L.T("referência a d3d12.dll no executável"); }
+                else if (s.Contains("vulkan-1.dll") && !s.Contains("d3d11.dll")) { g.Api = GfxApi.Vulkan; g.ApiSource = L.T("referência a vulkan-1.dll"); }
+                else if (s.Contains("d3d11.dll")) { g.Api = GfxApi.DX11; g.ApiSource = L.T("referência a d3d11.dll"); }
+                else if (s.Contains("d3d10.dll")) { g.Api = GfxApi.DX10; g.ApiSource = L.T("referência a d3d10.dll"); }
+                else if (s.Contains("d3d9.dll")) { g.Api = GfxApi.DX9; g.ApiSource = L.T("referência a d3d9.dll"); }
                 else if (igl) { g.Api = GfxApi.OpenGL; g.ApiSource = "importa opengl32.dll"; }
-                else { g.Api = GfxApi.Unknown; g.ApiSource = "não detectado"; }
+                else { g.Api = GfxApi.Unknown; g.ApiSource = L.T("não detectado"); }
             }
 
             // ---------- Upscalers / anti-cheat ----------
@@ -459,7 +459,7 @@ namespace Dlss5Injector
                 if (a != GfxApi.Unknown)
                 {
                     api = a;
-                    src = "log/config do Unreal (" + Path.GetFileName(f) + ")";
+                    src = L.T("log/config do Unreal (") + Path.GetFileName(f) + ")";
                     return;
                 }
             }
@@ -481,7 +481,7 @@ namespace Dlss5Injector
                 if (a != GfxApi.Unknown)
                 {
                     api = a;
-                    src = "Player.log do Unity";
+                    src = L.T("Player.log do Unity");
                     return;
                 }
             }

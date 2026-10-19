@@ -368,8 +368,8 @@ namespace Dlss5Injector
     /// <summary>Área de arrastar-e-soltar / clicar para escolher a pasta do jogo.</summary>
     public class DropZone : PaintedControl
     {
-        public string Headline = "Arraste a pasta do jogo aqui";
-        public string Sub = "ou clique para procurar · também aceita o .exe";
+        public string Headline = L.T("Arraste a pasta do jogo aqui");
+        public string Sub = L.T("ou clique para procurar · também aceita o .exe");
         public bool Filled;
         public bool IsDragOver;
 
@@ -489,7 +489,7 @@ namespace Dlss5Injector
     {
         List<string> steps = new List<string>();
         List<string> warns = new List<string>();
-        string header, empty = "Selecione a pasta do jogo para ver o plano.";
+        string header, empty = L.T("Selecione a pasta do jogo para ver o plano.");
         int scroll, contentH;
 
         public StepsView() { Font = Theme.F(9f); }
@@ -887,14 +887,14 @@ namespace Dlss5Injector
             }
             using (Font bf = Theme.F(7.5f, FontStyle.Bold))
             {
-                string src = Game.Source ?? "";
+                string src = L.T(Game.Source ?? "");
                 int sw = TextRenderer.MeasureText(src, bf).Width + 12;
                 RectangleF sb = new RectangleF(8, 8, sw, 20);
                 Theme.FillRound(g, Color.FromArgb(210, 14, 16, 20), sb, 10);
                 Theme.Draw(g, src, bf, Theme.Text, Rectangle.Round(sb), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
                 if (Game.Installed)
                 {
-                    string t = "DLSS 5";
+                    string t = L.T("DLSS 5");
                     int w = TextRenderer.MeasureText(t, bf).Width + 26;
                     RectangleF ib = new RectangleF(CoverW - w - 8, 8, w, 20);
                     Theme.FillRound(g, Theme.Accent, ib, 10);
@@ -909,7 +909,7 @@ namespace Dlss5Injector
                 using (Font gf = Theme.Icon(20f))
                 {
                     Theme.Draw(g, "", gf, Theme.Accent, new Rectangle(0, CoverH / 2 - 40, CoverW, 36), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
-                    Theme.Draw(g, "Configurar DLSS 5", f, Theme.Text, new Rectangle(0, CoverH / 2, CoverW, 24), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                    Theme.Draw(g, L.T("Configurar DLSS 5"), f, Theme.Text, new Rectangle(0, CoverH / 2, CoverW, 24), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
                 }
             }
             using (Font nf = Theme.F(9.5f, FontStyle.Bold))
@@ -966,12 +966,12 @@ namespace Dlss5Injector
                     }
                 }
                 Theme.FillRound(g, Theme.Accent, new RectangleF(0, Height - 16, 12, 12), 3);
-                Theme.Draw(g, "Quadro real (renderizado pelo jogo)", f, Theme.Muted, new Rectangle(18, Height - 20, 230, 20), TextFormatFlags.VerticalCenter);
+                Theme.Draw(g, L.T("Quadro real (renderizado pelo jogo)"), f, Theme.Muted, new Rectangle(18, Height - 20, 230, 20), TextFormatFlags.VerticalCenter);
                 if (m > 1 || dynamic)
                 {
                     Theme.FillRound(g, Color.FromArgb(40, Theme.Info), new RectangleF(256, Height - 16, 12, 12), 3);
                     Theme.DrawRound(g, Theme.Info, new RectangleF(256, Height - 16, 12, 12), 3);
-                    Theme.Draw(g, dynamic ? "Gerado pela IA (varia até 6X)" : "Quadro gerado pela IA (DLSS-G)", f, Theme.Muted,
+                    Theme.Draw(g, dynamic ? L.T("Gerado pela IA (varia até 6X)") : L.T("Quadro gerado pela IA (DLSS-G)"), f, Theme.Muted,
                         new Rectangle(274, Height - 20, 260, 20), TextFormatFlags.VerticalCenter);
                 }
             }

@@ -131,24 +131,24 @@ namespace Dlss5Injector
             Directory.CreateDirectory(compDir);
             Rel best = null;
             try { best = find(); }
-            catch (Exception ex) { log("  ! Sem acesso à internet/GitHub para " + label + ": " + ex.Message); }
+            catch (Exception ex) { log(L.T("  ! Sem acesso à internet/GitHub para ") + label + ": " + ex.Message); }
             if (best == null)
             {
                 string c = NewestCached(compDir);
                 if (c != null)
                 {
-                    log("  Usando " + label + " do cache: " + Path.GetFileName(c));
+                    log(L.T("  Usando ") + label + L.T(" do cache: ") + Path.GetFileName(c));
                     return c;
                 }
-                throw new Exception("Não foi possível obter " + label + " (sem internet e sem cache).");
+                throw new Exception(L.T("Não foi possível obter ") + label + L.T(" (sem internet e sem cache)."));
             }
             string dir = Path.Combine(compDir, Safe(best.Tag));
             if (File.Exists(Path.Combine(dir, ".ok")))
             {
-                log("  " + label + " " + best.Tag + " (já em cache)");
+                log("  " + label + " " + best.Tag + L.T(" (já em cache)"));
                 return dir;
             }
-            log("  Baixando " + label + " " + best.Tag + " (" + best.Asset + ")...");
+            log(L.T("  Baixando ") + label + " " + best.Tag + " (" + best.Asset + ")...");
             string tmp = Path.Combine(compDir, "download-" + Guid.NewGuid().ToString("N") + ext);
             try
             {
@@ -156,8 +156,8 @@ namespace Dlss5Injector
                 if (best.Sha != null)
                 {
                     string h = Util.Sha256(tmp);
-                    if (h != best.Sha) throw new Exception("SHA-256 do download não confere (" + best.Asset + "). Download descartado.");
-                    log("  SHA-256 verificado: " + h.Substring(0, 16) + "...");
+                    if (h != best.Sha) throw new Exception(L.T("SHA-256 do download não confere (") + best.Asset + L.T("). Download descartado."));
+                    log(L.T("  SHA-256 verificado: ") + h.Substring(0, 16) + "...");
                 }
                 string tmpDir = dir + ".tmp";
                 if (Directory.Exists(tmpDir)) Directory.Delete(tmpDir, true);
@@ -184,7 +184,7 @@ namespace Dlss5Injector
             {
                 return Newest(Releases("janblade/OptiScaler-F5-DLSSNR-Multipass", new Regex(@"^OptiScaler-DLSSNR-F5-(?!.*test).*\.zip$", RegexOptions.IgnoreCase), 15, true));
             }, Unzip, ".zip");
-            if (!File.Exists(Path.Combine(d, "OptiScaler.dll"))) throw new Exception("Pacote do OptiScaler sem OptiScaler.dll: " + d);
+            if (!File.Exists(Path.Combine(d, "OptiScaler.dll"))) throw new Exception(L.T("Pacote do OptiScaler sem OptiScaler.dll: ") + d);
             return d;
         }
 
@@ -195,7 +195,7 @@ namespace Dlss5Injector
                 return Newest(Releases("RankFTW/rhi-repo", new Regex(@"^renodx-dlss5_.*\.zip$", RegexOptions.IgnoreCase), 100, true));
             }, Unzip, ".zip");
             if (Directory.GetFiles(d, "renodx-dlss5.addon64", SearchOption.AllDirectories).Length == 0)
-                throw new Exception("Pacote RenoDX sem renodx-dlss5.addon64");
+                throw new Exception(L.T("Pacote RenoDX sem renodx-dlss5.addon64"));
             return d;
         }
 
@@ -206,7 +206,7 @@ namespace Dlss5Injector
                 return Newest(Releases("doitsujin/dxvk", new Regex(@"^dxvk-\d[\d.]*\.tar\.gz$", RegexOptions.IgnoreCase), 5, false));
             }, Tar.ExtractTarGz, ".tar.gz");
             string[] x64 = Directory.GetDirectories(d, "x64", SearchOption.AllDirectories);
-            if (x64.Length == 0) throw new Exception("Pacote DXVK sem pasta x64");
+            if (x64.Length == 0) throw new Exception(L.T("Pacote DXVK sem pasta x64"));
             return x64[0];
         }
 
@@ -216,7 +216,7 @@ namespace Dlss5Injector
             {
                 return Newest(Releases("dege-diosg/dgVoodoo2", new Regex(@"^dgVoodoo2_\d+_\d+(_\d+)?\.zip$", RegexOptions.IgnoreCase), 5, false));
             }, Unzip, ".zip");
-            if (!File.Exists(Path.Combine(d, "MS", "x64", "D3D9.dll"))) throw new Exception("Pacote dgVoodoo2 sem MS\\x64\\D3D9.dll");
+            if (!File.Exists(Path.Combine(d, "MS", "x64", "D3D9.dll"))) throw new Exception(L.T("Pacote dgVoodoo2 sem MS\\x64\\D3D9.dll"));
             return d;
         }
 
@@ -226,15 +226,15 @@ namespace Dlss5Injector
         /// </summary>
         public string EnsureSm86()
         {
-            string d = Ensure("dlssg_for_sm86", "dlssg_for_sm86 (MFG para RTX 30/20)", delegate
+            string d = Ensure("dlssg_for_sm86", L.T("dlssg_for_sm86 (MFG para RTX 30/20)"), delegate
             {
                 return Newest(Releases("sdli1995/dlssg_for_sm86", new Regex(@"^dlssg-release-[\d.]+-x64\.zip$", RegexOptions.IgnoreCase), 10, false));
             }, Unzip, ".zip");
             string rt = Path.Combine(d, "dlssg_sm86", "runtime", "nvngx_dlssg.dll");
             if (!File.Exists(Path.Combine(d, "version.dll")) || !File.Exists(rt))
-                throw new Exception("Pacote dlssg_for_sm86 incompleto: " + d);
+                throw new Exception(L.T("Pacote dlssg_for_sm86 incompleto: ") + d);
             if (!Signature.IsNvidiaSigned(rt))
-                throw new Exception("O nvngx_dlssg.dll do pacote dlssg_for_sm86 não tem assinatura NVIDIA válida — instalação cancelada.");
+                throw new Exception(L.T("O nvngx_dlssg.dll do pacote dlssg_for_sm86 não tem assinatura NVIDIA válida — instalação cancelada."));
             return d;
         }
 
@@ -263,7 +263,7 @@ namespace Dlss5Injector
                     }
                 }
             }, ".zip");
-            if (!Installer.IsStreamlineDir(d)) throw new Exception("Pacote do Streamline sem bin\\x64: " + d);
+            if (!Installer.IsStreamlineDir(d)) throw new Exception(L.T("Pacote do Streamline sem bin\\x64: ") + d);
             return d;
         }
 
@@ -273,7 +273,7 @@ namespace Dlss5Injector
             {
                 string html = GetString("https://reshade.me/");
                 Match m = Regex.Match(html, @"/downloads/ReShade_Setup_([\d.]+)_Addon\.exe");
-                if (!m.Success) throw new Exception("link do ReShade não encontrado em reshade.me");
+                if (!m.Success) throw new Exception(L.T("link do ReShade não encontrado em reshade.me"));
                 Rel r = new Rel();
                 r.Tag = m.Groups[1].Value;
                 r.Asset = "ReShade_Setup_" + r.Tag + "_Addon.exe";
@@ -302,7 +302,7 @@ namespace Dlss5Injector
                 }
                 catch { }
             }
-            throw new Exception("ReShade64.dll não encontrado no instalador do ReShade.");
+            throw new Exception(L.T("ReShade64.dll não encontrado no instalador do ReShade."));
         }
     }
 

@@ -45,26 +45,26 @@ namespace Dlss5Injector
         {
             switch (m)
             {
-                case Method.Opti: return "OptiScaler F5 (DLSS-NR Multipass)";
-                case Method.RenoDX: return "RenoDX DLSS 5 (ReShade add-on)";
-                case Method.DxvkOpti: return "DXVK (→Vulkan) + OptiScaler F5";
-                case Method.DgVoodooOpti: return "dgVoodoo2 (DX9→DX12) + OptiScaler F5";
+                case Method.Opti: return L.T("OptiScaler F5 (DLSS-NR Multipass)");
+                case Method.RenoDX: return L.T("RenoDX DLSS 5 (ReShade add-on)");
+                case Method.DxvkOpti: return L.T("DXVK (→Vulkan) + OptiScaler F5");
+                case Method.DgVoodooOpti: return L.T("dgVoodoo2 (DX9→DX12) + OptiScaler F5");
             }
-            return "Nenhum";
+            return L.T("Nenhum");
         }
 
         public static string ApiName(GfxApi a)
         {
             switch (a)
             {
-                case GfxApi.DX9: return "DirectX 9";
-                case GfxApi.DX10: return "DirectX 10";
-                case GfxApi.DX11: return "DirectX 11";
-                case GfxApi.DX12: return "DirectX 12";
+                case GfxApi.DX9: return L.T("DirectX 9");
+                case GfxApi.DX10: return L.T("DirectX 10");
+                case GfxApi.DX11: return L.T("DirectX 11");
+                case GfxApi.DX12: return L.T("DirectX 12");
                 case GfxApi.Vulkan: return "Vulkan";
                 case GfxApi.OpenGL: return "OpenGL";
             }
-            return "Desconhecida";
+            return L.T("Desconhecida");
         }
 
         /// <summary>Métodos compatíveis, do melhor para o pior.</summary>
@@ -74,7 +74,7 @@ namespace Dlss5Injector
             why = "";
             if (!g.Is64)
             {
-                why = "Jogo 32-bit: o OptiScaler, o DLSS-NR e o add-on RenoDX DLSS 5 só existem em 64-bit.";
+                why = L.T("Jogo 32-bit: o OptiScaler, o DLSS-NR e o add-on RenoDX DLSS 5 só existem em 64-bit.");
                 return l;
             }
             switch (api)
@@ -83,47 +83,47 @@ namespace Dlss5Injector
                     l.Add(Method.Opti);
                     if (g.HasDlss) l.Add(Method.RenoDX);
                     why = g.HasUpscaler
-                        ? "DX12 nativo com upscaler: caminho mais completo do fork (NR antes/depois do SR, multipass, FG)."
-                        : "DX12 sem upscaler: o fork usa o 'Optical F5Low' (profundidade e movimento próprios) para aplicar o NR na imagem final.";
+                        ? L.T("DX12 nativo com upscaler: caminho mais completo do fork (NR antes/depois do SR, multipass, FG).")
+                        : L.T("DX12 sem upscaler: o fork usa o 'Optical F5Low' (profundidade e movimento próprios) para aplicar o NR na imagem final.");
                     break;
                 case GfxApi.DX11:
                     if (g.HasDlss)
                     {
                         l.Add(Method.RenoDX);
                         l.Add(Method.Opti);
-                        why = "DX11 com DLSS nativo: o add-on RenoDX DLSS 5 engancha o DLSS do próprio jogo direto no DX11.";
+                        why = L.T("DX11 com DLSS nativo: o add-on RenoDX DLSS 5 engancha o DLSS do próprio jogo direto no DX11.");
                     }
                     else if (g.HasFsr || g.HasXess)
                     {
                         l.Add(Method.Opti);
                         l.Add(Method.DxvkOpti);
-                        why = "DX11 com FSR/XeSS: o OptiScaler troca o upscaler por DLSS via ponte DX11→DX12 (dlss_12), a única que roda o NR.";
+                        why = L.T("DX11 com FSR/XeSS: o OptiScaler troca o upscaler por DLSS via ponte DX11→DX12 (dlss_12), a única que roda o NR.");
                     }
                     else
                     {
                         l.Add(Method.DxvkOpti);
                         l.Add(Method.Opti);
-                        why = "DX11 sem upscaler: o NR na imagem final em DX11 é feito pelo fork através do DXVK (NativeDxvkVulkan).";
+                        why = L.T("DX11 sem upscaler: o NR na imagem final em DX11 é feito pelo fork através do DXVK (NativeDxvkVulkan).");
                     }
                     break;
                 case GfxApi.Vulkan:
                     l.Add(Method.Opti);
-                    why = "Vulkan: só o OptiScaler funciona (o ReShade/RenoDX DLSS 5 não carrega em Vulkan).";
+                    why = L.T("Vulkan: só o OptiScaler funciona (o ReShade/RenoDX DLSS 5 não carrega em Vulkan).");
                     break;
                 case GfxApi.DX10:
                     l.Add(Method.DxvkOpti);
-                    why = "DX10: convertido para Vulkan pelo DXVK; o OptiScaler aplica o NR na imagem final (experimental).";
+                    why = L.T("DX10: convertido para Vulkan pelo DXVK; o OptiScaler aplica o NR na imagem final (experimental).");
                     break;
                 case GfxApi.DX9:
                     l.Add(Method.DgVoodooOpti);
                     l.Add(Method.DxvkOpti);
-                    why = "DX9: convertido para DX12 pelo dgVoodoo2; o OptiScaler aplica o NR na imagem final (experimental).";
+                    why = L.T("DX9: convertido para DX12 pelo dgVoodoo2; o OptiScaler aplica o NR na imagem final (experimental).");
                     break;
                 case GfxApi.OpenGL:
-                    why = "OpenGL não é suportado pelo OptiScaler nem pelo RenoDX.";
+                    why = L.T("OpenGL não é suportado pelo OptiScaler nem pelo RenoDX.");
                     break;
                 default:
-                    why = "API não detectada: escolha manualmente a API gráfica.";
+                    why = L.T("API não detectada: escolha manualmente a API gráfica.");
                     break;
             }
             return l;
@@ -157,23 +157,23 @@ namespace Dlss5Injector
             if (m == Method.None) return p;
 
             if (!string.IsNullOrEmpty(g.AntiCheat))
-                p.Warnings.Add("Anti-cheat detectado (" + g.AntiCheat + "). Injetar DLLs pode causar BANIMENTO em modo online. Use só offline/single-player.");
+                p.Warnings.Add(L.T("Anti-cheat detectado (") + g.AntiCheat + L.T("). Injetar DLLs pode causar BANIMENTO em modo online. Use só offline/single-player."));
             if (Gpu.IsNvidia && Gpu.Series > 0 && Gpu.Series < 20)
-                p.Warnings.Add("GPU sem núcleos Tensor (pré-RTX): o DLSS não roda.");
+                p.Warnings.Add(L.T("GPU sem núcleos Tensor (pré-RTX): o DLSS não roda."));
 
             p.UpdateGameDlss = o.UpdateDlss && g.DlssDlls.Count > 0;
 
             if (m == Method.RenoDX)
             {
                 p.Proxy = "dxgi.dll";
-                p.Steps.Add("ReShade (com suporte a add-ons) como dxgi.dll");
-                p.Steps.Add("Add-on RenoDX DLSS 5 (renodx-dlss5.addon64) — engancha o DLSS do próprio jogo");
-                p.Steps.Add("Runtime DLSS-NR (nvngx_dlssnr.dll)");
+                p.Steps.Add(L.T("ReShade (com suporte a add-ons) como dxgi.dll"));
+                p.Steps.Add(L.T("Add-on RenoDX DLSS 5 (renodx-dlss5.addon64) — engancha o DLSS do próprio jogo"));
+                p.Steps.Add(L.T("Runtime DLSS-NR (nvngx_dlssnr.dll)"));
                 if (g.DxgiKind != null && g.DxgiKind != "DLSS5 Injector" && g.DxgiKind != "ReShade")
-                    p.Warnings.Add("Já existe um dxgi.dll (" + g.DxgiKind + "). Ele será guardado como backup.");
+                    p.Warnings.Add(L.T("Já existe um dxgi.dll (") + g.DxgiKind + L.T("). Ele será guardado como backup."));
                 if (o.FrameGen)
-                    p.Warnings.Add("No método RenoDX, use o Frame Generation do próprio jogo (o add-on não gera quadros).");
-                p.Steps.Add("No jogo: ative o DLSS nas opções gráficas; o menu do ReShade (tecla Home) mostra o add-on.");
+                    p.Warnings.Add(L.T("No método RenoDX, use o Frame Generation do próprio jogo (o add-on não gera quadros)."));
+                p.Steps.Add(L.T("No jogo: ative o DLSS nas opções gráficas; o menu do ReShade (tecla Home) mostra o add-on."));
                 AddDlssUpdateStep(p, g);
                 return p;
             }
@@ -194,7 +194,7 @@ namespace Dlss5Injector
             {
                 p.MoveReShade = true;
                 p.SetIni("Plugins", "LoadReshade", "true");
-                p.Steps.Add("ReShade existente renomeado para ReShade64.dll e carregado pelo OptiScaler (LoadReshade=true)");
+                p.Steps.Add(L.T("ReShade existente renomeado para ReShade64.dll e carregado pelo OptiScaler (LoadReshade=true)"));
             }
 
             // ---------- Camadas de tradução ----------
@@ -203,19 +203,19 @@ namespace Dlss5Injector
                 if (api == GfxApi.DX9) p.DxvkDlls = new[] { "d3d9.dll" };
                 else if (api == GfxApi.DX10) p.DxvkDlls = new[] { "d3d10core.dll", "d3d11.dll", "dxgi.dll" };
                 else p.DxvkDlls = new[] { "d3d11.dll", "dxgi.dll" };
-                p.Steps.Add("DXVK (" + string.Join(", ", p.DxvkDlls) + ") — " + ApiName(api) + " → Vulkan");
+                p.Steps.Add(L.T("DXVK (") + string.Join(", ", p.DxvkDlls) + ") — " + ApiName(api) + L.T(" → Vulkan"));
                 if (api == GfxApi.DX10 || api == GfxApi.DX11) p.SetIni("DlssNr", "NativeDxvkVulkan", "true");
-                p.Warnings.Add("Caminho experimental: o NR em jogos " + ApiName(api) + " via DXVK é suportado pelo fork, mas varia por jogo.");
+                p.Warnings.Add(L.T("Caminho experimental: o NR em jogos ") + ApiName(api) + L.T(" via DXVK é suportado pelo fork, mas varia por jogo."));
             }
             if (m == Method.DgVoodooOpti)
             {
                 p.DgVoodoo = true;
-                p.Steps.Add("dgVoodoo2 (D3D9.dll x64, saída d3d12_fl12_0, sem marca d'água) — DX9 → DX12");
-                p.Warnings.Add("Caminho experimental: DX9 → DX12 via dgVoodoo2. Se não funcionar, troque o método para DXVK.");
+                p.Steps.Add(L.T("dgVoodoo2 (D3D9.dll x64, saída d3d12_fl12_0, sem marca d'água) — DX9 → DX12"));
+                p.Warnings.Add(L.T("Caminho experimental: DX9 → DX12 via dgVoodoo2. Se não funcionar, troque o método para DXVK."));
             }
 
-            p.Steps.Add("OptiScaler F5 como " + p.Proxy + " + OptiScaler.ini + pasta OptiScaler\\ + forwarder nvngx.dll_dlssnr.dll");
-            p.Steps.Add("Runtime DLSS-NR (nvngx_dlssnr.dll)");
+            p.Steps.Add(L.T("OptiScaler F5 como ") + p.Proxy + L.T(" + OptiScaler.ini + pasta OptiScaler\\ + forwarder nvngx.dll_dlssnr.dll"));
+            p.Steps.Add(L.T("Runtime DLSS-NR (nvngx_dlssnr.dll)"));
             p.PlaceDlss = true;
 
             // ---------- INI ----------
@@ -224,7 +224,7 @@ namespace Dlss5Injector
             if (Gpu.Series == 20 || Gpu.Series == 30)
             {
                 p.SetIni("DlssNr", "WorkingScale", "0.75");
-                p.Warnings.Add("RTX " + Gpu.Series + ": o NR roda num caminho FP16 mais pesado; resolução do modelo reduzida para 0.75.");
+                p.Warnings.Add(L.T("RTX ") + Gpu.Series + L.T(": o NR roda num caminho FP16 mais pesado; resolução do modelo reduzida para 0.75."));
             }
             else p.SetIni("DlssNr", "WorkingScale", "1.0");
 
@@ -249,16 +249,16 @@ namespace Dlss5Injector
                     if (Gpu.Series == 40 && nat > 2) AdaUnlock(p);
                 }
                 else if (fgOut == "dlssg") AddSm86(p, g, nat, true);   // RTX 30/20: libera o DLSS-G do próprio jogo
-                else p.Warnings.Add("O DLSS Frame Generation do jogo precisa de uma GPU NVIDIA RTX.");
-                if (fgOut == "dlssg" || Gpu.Series >= 40) p.Steps.Add("MFG por IA do próprio jogo (DLSS-G) em " + (o.FgDynamic && Gpu.Series >= 50 ? "modo dinâmico" : nat + "X") +
-                            " — ative o Frame Generation no menu do jogo");
+                else p.Warnings.Add(L.T("O DLSS Frame Generation do jogo precisa de uma GPU NVIDIA RTX."));
+                if (fgOut == "dlssg" || Gpu.Series >= 40) p.Steps.Add(L.T("MFG por IA do próprio jogo (DLSS-G) em ") + (o.FgDynamic && Gpu.Series >= 50 ? L.T("modo dinâmico") : nat + "X") +
+                            L.T(" — ative o Frame Generation no menu do jogo"));
             }
 
             if (nativeUpscaler)
             {
                 p.SetIni("DlssNr", "RunBeforeSR", o.RunBeforeSR ? "true" : "false");
-                if (g.HasDlssD) p.Warnings.Add("O jogo tem Ray Reconstruction: com RR ativo o NR sempre roda depois do SR.");
-                p.Steps.Add("No jogo: selecione DLSS (ou FSR/XeSS) nas opções; aperte Insert para abrir o menu do OptiScaler.");
+                if (g.HasDlssD) p.Warnings.Add(L.T("O jogo tem Ray Reconstruction: com RR ativo o NR sempre roda depois do SR."));
+                p.Steps.Add(L.T("No jogo: selecione DLSS (ou FSR/XeSS) nas opções; aperte Insert para abrir o menu do OptiScaler."));
             }
             else
             {
@@ -269,17 +269,17 @@ namespace Dlss5Injector
                     p.SetIni("DlssNr", "NativeMotion", "true");
                     p.SetIni("DlssNr", "NativeUpscaler", "true");
                     p.SetIni("DlssNr", "NativeInput", "false");
-                    p.Steps.Add("Optical F5Low: NR + Frame Generation (profundidade/movimento estimados pelo fork)");
+                    p.Steps.Add(L.T("Optical F5Low: NR + Frame Generation (profundidade/movimento estimados pelo fork)"));
                 }
                 else
                 {
                     if (m == Method.DxvkOpti || m == Method.DgVoodooOpti) p.SetIni("DlssNr", "NativeDepthFinder", "true");
                     p.SetIni("DlssNr", "NativeInput", "true");
-                    p.Steps.Add("Optical F5Low: NR na imagem final (jogo sem upscaler)");
+                    p.Steps.Add(L.T("Optical F5Low: NR na imagem final (jogo sem upscaler)"));
                 }
                 if (m == Method.Opti && api == GfxApi.DX11)
-                    p.Warnings.Add("DX11 sem upscaler direto (sem DXVK) pode não ativar o NR. Se não funcionar, use o método DXVK.");
-                p.Steps.Add("No jogo: aperte Insert → página Optical F5Low / Neural Rendering para ajustar.");
+                    p.Warnings.Add(L.T("DX11 sem upscaler direto (sem DXVK) pode não ativar o NR. Se não funcionar, use o método DXVK."));
+                p.Steps.Add(L.T("No jogo: aperte Insert → página Optical F5Low / Neural Rendering para ajustar."));
             }
 
             if (fg)
@@ -296,14 +296,14 @@ namespace Dlss5Injector
                     if (Gpu.Series == 40 && mult > 2) AdaUnlock(p);
                     if (Gpu.Series >= 20 && Gpu.Series <= 30) AddSm86(p, g, Math.Max(2, mult), false);
                     p.CopyStreamlineFG = true;
-                    p.Steps.Add("Streamline " + "(sl.interposer/common/dlss_g/reflex/pcl + nvngx_dlssg 310.9) em OptiScaler\\streamline");
-                    if (g.HasStreamline) p.Warnings.Add("O jogo tem Streamline próprio; os arquivos do jogo NÃO são tocados (o FG do OptiScaler usa a subpasta dele).");
+                    p.Steps.Add(L.T("Streamline ") + L.T("(sl.interposer/common/dlss_g/reflex/pcl + nvngx_dlssg 310.9) em OptiScaler\\streamline"));
+                    if (g.HasStreamline) p.Warnings.Add(L.T("O jogo tem Streamline próprio; os arquivos do jogo NÃO são tocados (o FG do OptiScaler usa a subpasta dele)."));
                 }
                 else if (fgOut == "xefg") p.SetIni("XeFG", "InterpolationCount", (Math.Max(2, mult) - 1).ToString());
-                p.Steps.Add("Multi Frame Generation por IA: " + fgLabel + " em " + (dyn ? "modo dinâmico (até 6X, alvo = Hz do monitor)" : Math.Max(2, mult) + "X") +
-                    (nativeUpscaler ? " usando os vetores de movimento do jogo" : " — jogo sem suporte: o OptiScaler gera profundidade e movimento (Optical F5Low)"));
+                p.Steps.Add(L.T("Multi Frame Generation por IA: ") + fgLabel + L.T(" em ") + (dyn ? L.T("modo dinâmico (até 6X, alvo = Hz do monitor)") : Math.Max(2, mult) + "X") +
+                    (nativeUpscaler ? L.T(" usando os vetores de movimento do jogo") : L.T(" — jogo sem suporte: o OptiScaler gera profundidade e movimento (Optical F5Low)")));
                 if (o.FgMult > cap && !dyn)
-                    p.Warnings.Add("Pedido " + o.FgMult + "X, mas " + fgLabel + " nesta GPU/API vai até " + cap + "X — usando " + cap + "X.");
+                    p.Warnings.Add(L.T("Pedido ") + o.FgMult + L.T("X, mas ") + fgLabel + L.T(" nesta GPU/API vai até ") + cap + L.T("X — usando ") + cap + "X.");
             }
             else
             {
@@ -326,24 +326,24 @@ namespace Dlss5Injector
         /// </summary>
         public static string FgOutput(GfxApi optiApi, out int cap, out string label)
         {
-            if (Gpu.IsNvidia && Gpu.Series >= 50) { cap = 6; label = "NVIDIA DLSS 4 Multi Frame Generation"; return "dlssg"; }
-            if (Gpu.IsNvidia && Gpu.Series == 40) { cap = 4; label = "NVIDIA DLSS Multi Frame Generation (desbloqueio RTX 40)"; return "dlssg"; }
+            if (Gpu.IsNvidia && Gpu.Series >= 50) { cap = 6; label = L.T("NVIDIA DLSS 4 Multi Frame Generation"); return "dlssg"; }
+            if (Gpu.IsNvidia && Gpu.Series == 40) { cap = 4; label = L.T("NVIDIA DLSS Multi Frame Generation (desbloqueio RTX 40)"); return "dlssg"; }
             if (Gpu.IsNvidia && Gpu.Series >= 20 && optiApi == GfxApi.DX12)
             {
                 cap = 4;
-                label = "NVIDIA DLSS Multi Frame Generation (dlssg_for_sm86)";
+                label = L.T("NVIDIA DLSS Multi Frame Generation (dlssg_for_sm86)");
                 return "dlssg";
             }
-            if (optiApi != GfxApi.Vulkan) { cap = 4; label = "Intel XeSS Frame Generation (IA)"; return "xefg"; }
+            if (optiApi != GfxApi.Vulkan) { cap = 4; label = L.T("Intel XeSS Frame Generation (IA)"); return "xefg"; }
             cap = 2;
-            label = "AMD FSR Frame Generation";
+            label = L.T("AMD FSR Frame Generation");
             return "fsrfg";
         }
 
         static void AdaUnlock(InstallPlan p)
         {
             p.SetIni("DLSSG", "AdaMfgUnlock", "true");
-            p.Warnings.Add("RTX 40 acima de 2X usa o desbloqueio de MFG embutido no OptiScaler F5 (experimental). Se travar, volte para 2X.");
+            p.Warnings.Add(L.T("RTX 40 acima de 2X usa o desbloqueio de MFG embutido no OptiScaler F5 (experimental). Se travar, volte para 2X."));
         }
 
         /// <summary>RTX 30/20: módulo dlssg_for_sm86 ao lado do jogo, com o runtime DLSS-G oficial da NVIDIA.</summary>
@@ -364,11 +364,11 @@ namespace Dlss5Injector
                 break;
             }
             if (p.Sm86Proxy == null) p.Sm86Proxy = "version.dll";
-            p.Steps.Add("dlssg_for_sm86 (sdli1995) como " + p.Sm86Proxy + ": libera o DLSS-G da NVIDIA na RTX " + Gpu.Series +
-                        " com o runtime oficial 310.9.16 (até " + (p.Sm86MaxFrames + 1) + "X)");
+            p.Steps.Add(L.T("dlssg_for_sm86 (sdli1995) como ") + p.Sm86Proxy + L.T(": libera o DLSS-G da NVIDIA na RTX ") + Gpu.Series +
+                        L.T(" com o runtime oficial 310.9.16 (até ") + (p.Sm86MaxFrames + 1) + L.T("X)"));
             p.Warnings.Add(gameOwnFg
-                ? "RTX " + Gpu.Series + ": o MFG vem do dlssg_for_sm86 (comunitário). Testado pelo autor em RTX 3070/2080 Ti; comece em 2X."
-                : "RTX " + Gpu.Series + " em jogo sem suporte: DLSS-G via OptiScaler + dlssg_for_sm86 é experimental. Se não ativar, use 1X (desligado) e teste de novo.");
+                ? L.T("RTX ") + Gpu.Series + L.T(": o MFG vem do dlssg_for_sm86 (comunitário). Testado pelo autor em RTX 3070/2080 Ti; comece em 2X.")
+                : L.T("RTX ") + Gpu.Series + L.T(" em jogo sem suporte: DLSS-G via OptiScaler + dlssg_for_sm86 é experimental. Se não ativar, use 1X (desligado) e teste de novo."));
         }
 
         /// <summary>
@@ -404,16 +404,16 @@ namespace Dlss5Injector
         static void AddConflicts(InstallPlan p, GameInfo g)
         {
             foreach (KeyValuePair<string, string> c in FindConflicts(p, g.ExeDir, g.Ours))
-                p.Steps.Insert(0, "Desativar " + c.Value + " antigo (" + c.Key + " → backup .dlss5bak) para não carregar duas vezes");
+                p.Steps.Insert(0, L.T("Desativar ") + c.Value + L.T(" antigo (") + c.Key + L.T(" → backup .dlss5bak) para não carregar duas vezes"));
         }
 
         static void AddDlssUpdateStep(InstallPlan p, GameInfo g)
         {
             AddConflicts(p, g);
             if (p.UpdateGameDlss)
-                p.Steps.Add("Atualizar DLLs DLSS do jogo (" + g.DlssDlls.Count + " arquivo(s)) para as versões da pasta Streamline, com backup");
+                p.Steps.Add(L.T("Atualizar DLLs DLSS do jogo (") + g.DlssDlls.Count + L.T(" arquivo(s)) para as versões da pasta Streamline, com backup"));
             if (p.PlaceDlss)
-                p.Steps.Add("nvngx_dlss.dll 310.9.x da pasta Streamline ao lado do exe (se o jogo não tiver)");
+                p.Steps.Add(L.T("nvngx_dlss.dll 310.9.x da pasta Streamline ao lado do exe (se o jogo não tiver)"));
         }
     }
 }

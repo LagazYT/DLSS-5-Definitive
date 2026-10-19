@@ -70,6 +70,14 @@ namespace Dlss5Injector
         System.Windows.Forms.Timer updTimer;
         bool checkingUpdate, updating;
 
+        // ---- configurações
+        Panel pageCfg;
+        DarkCombo cmbLang;
+        ToggleSwitch tgAutoUpd;
+        StatusRow rowUpd, rowSlCfg, rowNrCfg;
+        Label lblData;
+        bool langLoading;
+
         public MainForm(string initialFolder) : this(initialFolder, false) { }
 
         public MainForm(string initialFolder, bool justUpdated)
@@ -77,7 +85,7 @@ namespace Dlss5Injector
             SuspendLayout();
             AutoScaleDimensions = new SizeF(96F, 96F);
             AutoScaleMode = AutoScaleMode.Dpi;
-            Text = Program.AppName + " " + Program.Version + " — por " + Program.Author + (AppPaths.IsPortable ? "  (Portable)" : "");
+            Text = Program.AppName + " " + Program.Version + " — " + L.T("criado por") + " " + Program.Author + (AppPaths.IsPortable ? "  (Portable)" : "");
             Icon = Theme.AppIcon();
             BackColor = Theme.Bg;
             ForeColor = Theme.Text;
@@ -90,18 +98,21 @@ namespace Dlss5Injector
             DoubleBuffered = true;
 
             Gpu.Detect();
-            tabs = new TabBar(new[] { "Biblioteca", "Injetor DLSS 5", "Frame Gen" }, new[] { "", "", "" });
-            tabs.SetBounds(318, 20, 470, 40);
+            tabs = new TabBar(new[] { L.T("Biblioteca"), L.T("Injetor DLSS 5"), L.T("Frame Gen"), L.T("Configurações") },
+                              new[] { "\uE8F1", "\uE945", "\uE916", "\uE713" });   // \uE713 = engrenagem
+            tabs.SetBounds(338, 20, 600, 40);
             tabs.SelectedChanged += delegate { ShowPage(tabs.Selected); };
             Controls.Add(tabs);
 
             pageLib = NewPage();
             pageInj = NewPage();
             pageFg = NewPage();
+            pageCfg = NewPage();
             BuildLibrary();
             BuildInjector();
             BuildFrameGen();
             BuildUpdateUi();
+            BuildSettings();
             ShowPage(0);
             ResumeLayout(false);
 
@@ -116,7 +127,7 @@ namespace Dlss5Injector
 
             DragEnter += OnDragEnter;
             DragDrop += OnDragDrop;
-            Log("Pronto.");
+            Log(L.T("Pronto."));
 
             covers = new CoverService(OnCoverReady);
             LoadLibrary();
@@ -129,11 +140,15 @@ namespace Dlss5Injector
                 }
                 StartScan(null);
                 if (justUpdated)
-                    ShowBanner("✔  DLSS 5 Definitive atualizado para a versão " + Program.Version + ".", false);
+                    ShowBanner(L.T("✔  DLSS 5 Definitive atualizado para a versão ") + Program.Version + ".", false);
                 // Verifica atualizações alguns segundos depois de abrir e depois a cada 6 horas
                 updTimer = new System.Windows.Forms.Timer();
                 updTimer.Interval = 4000;
-                updTimer.Tick += delegate { updTimer.Interval = 6 * 60 * 60 * 1000; CheckForUpdates(false); };
+                updTimer.Tick += delegate
+                {
+                    updTimer.Interval = 6 * 60 * 60 * 1000;
+                    if (Settings.Get("autoUpdate") != "0") CheckForUpdates(false);
+                };
                 updTimer.Start();
             };
             FormClosing += delegate { if (scanner != null) scanner.Cancel = true; LibraryStore.Save(games); };
@@ -143,9 +158,9 @@ namespace Dlss5Injector
 
         void BuildUpdateUi()
         {
-            btnVersion = new ModernButton("v" + Program.Version + "  ·  atualizações", null, ButtonKind.Ghost);
+            btnVersion = new ModernButton("v" + Program.Version + L.T("  ·  atualizações"), null, ButtonKind.Ghost);
             btnVersion.Font = Theme.F(8f);
-            btnVersion.SetBounds(178, 40, 132, 22);
+            btnVersion.SetBounds(178, 40, 156, 22);
             btnVersion.Click += delegate { if (pendingUpdate != null) DoUpdate(); else CheckForUpdates(true); };
             Controls.Add(btnVersion);
 
@@ -156,11 +171,11 @@ namespace Dlss5Injector
             Controls.Add(banner);
             lblBanner = TextLabel(banner, "", 24, 0, 600, 48, Theme.F(10f, FontStyle.Bold), Theme.AccentHover);
             lblBanner.TextAlign = ContentAlignment.MiddleLeft;
-            btnNotes = new ModernButton("Novidades", null, ButtonKind.Ghost);
+            btnNotes = new ModernButton(L.T("Novidades"), null, ButtonKind.Ghost);
             btnNotes.SetBounds(690, 9, 110, 30);
             btnNotes.Click += delegate { if (pendingUpdate != null) Process.Start(pendingUpdate.PageUrl); };
             banner.Controls.Add(btnNotes);
-            btnUpdate = new ModernButton("  Atualizar agora", Theme.GDownload, ButtonKind.Primary);
+            btnUpdate = new ModernButton(L.T("  Atualizar agora"), Theme.GDownload, ButtonKind.Primary);
             btnUpdate.Font = Theme.F(9.5f, FontStyle.Bold);
             btnUpdate.SetBounds(810, 7, 230, 34);
             btnUpdate.Click += delegate { DoUpdate(); };
@@ -179,7 +194,7 @@ namespace Dlss5Injector
             {
                 int h = banner.Height;
                 banner.Top = pageLib.Top;
-                foreach (Panel p in new[] { pageLib, pageInj, pageFg }) p.Top += h;
+                foreach (Panel p in new[] { pageLib, pageInj, pageFg, pageCfg }) p.Top += h;
                 ClientSize = new Size(ClientSize.Width, ClientSize.Height + h);
                 banner.Visible = true;
                 banner.BringToFront();
@@ -199,7 +214,7 @@ namespace Dlss5Injector
             if (!banner.Visible) return;
             int h = banner.Height;
             banner.Visible = false;
-            foreach (Panel p in new[] { pageLib, pageInj, pageFg }) p.Top -= h;
+            foreach (Panel p in new[] { pageLib, pageInj, pageFg, pageCfg }) p.Top -= h;
             ClientSize = new Size(ClientSize.Width, ClientSize.Height - h);
         }
 
@@ -207,7 +222,8 @@ namespace Dlss5Injector
         {
             if (checkingUpdate || updating) return;
             checkingUpdate = true;
-            if (manual) btnVersion.Text = "verificando...";
+            if (manual) btnVersion.Text = L.T("verificando...");
+            if (rowUpd != null) rowUpd.Set(Theme.GSync, Theme.Info, "v" + Program.Version + "  ·  " + L.T("verificando..."));
             Thread t = new Thread(delegate()
             {
                 UpdateInfo info = null;
@@ -216,20 +232,22 @@ namespace Dlss5Injector
                 SafeInvoke(delegate
                 {
                     checkingUpdate = false;
+                    Settings.Set("lastUpdateCheck", DateTime.Now.ToString("yyyy-MM-dd HH:mm"));
+                    UpdateUpdRow(info, err);
                     if (info != null)
                     {
                         pendingUpdate = info;
                         btnVersion.Text = "v" + Program.Version + "  →  " + info.Tag;
                         btnVersion.ForeColor = Theme.Warn;
-                        ShowBanner("⬆  Nova versão " + info.Tag + " do DLSS 5 Definitive disponível  (você tem a " + Program.Version + ")", true);
+                        ShowBanner(L.T("⬆  Nova versão ") + info.Tag + L.T(" do DLSS 5 Definitive disponível  (você tem a ") + Program.Version + ")", true);
                         return;
                     }
-                    btnVersion.Text = "v" + Program.Version + "  ·  atualizações";
+                    btnVersion.Text = "v" + Program.Version + L.T("  ·  atualizações");
                     if (!manual) return;
                     if (err != null)
-                        MessageBox.Show(this, "Não foi possível verificar atualizações:\r\n" + err.Message, Program.AppName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        MessageBox.Show(this, L.T("Não foi possível verificar atualizações:\r\n") + err.Message, Program.AppName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     else
-                        MessageBox.Show(this, "Você já está na versão mais recente (" + Program.Version + ").", Program.AppName, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        MessageBox.Show(this, L.T("Você já está na versão mais recente (") + Program.Version + ").", Program.AppName, MessageBoxButtons.OK, MessageBoxIcon.Information);
                 });
             });
             t.IsBackground = true;
@@ -242,24 +260,24 @@ namespace Dlss5Injector
             if (u == null || updating) return;
             if (busy)
             {
-                MessageBox.Show(this, "Espere terminar a instalação/análise em andamento e clique em Atualizar de novo.", Program.AppName);
+                MessageBox.Show(this, L.T("Espere terminar a instalação/análise em andamento e clique em Atualizar de novo."), Program.AppName);
                 return;
             }
             string notes = Updater.PlainNotes(u.Notes, 700);
-            if (MessageBox.Show(this, "Atualizar o DLSS 5 Definitive de " + Program.Version + " para " + u.Tag + "?\r\n\r\n" +
-                    (notes.Length > 0 ? notes + "\r\n\r\n" : "") +
-                    "O app baixa a versão nova, confere o SHA-256, fecha e abre de novo sozinho. Suas configurações e a biblioteca são mantidas.",
+            if (MessageBox.Show(this, L.T("Atualizar o DLSS 5 Definitive de ") + Program.Version + L.T(" para ") + u.Tag + L.T("?\r\n\r\n") +
+                    (notes.Length > 0 ? notes + L.T("\r\n\r\n") : "") +
+                    L.T("O app baixa a versão nova, confere o SHA-256, fecha e abre de novo sozinho. Suas configurações e a biblioteca são mantidas."),
                     Program.AppName, MessageBoxButtons.OKCancel, MessageBoxIcon.Information) != DialogResult.OK) return;
             updating = true;
             btnUpdate.Enabled = btnDismiss.Enabled = btnNotes.Enabled = false;
-            btnUpdate.Text = "  Baixando...";
+            btnUpdate.Text = L.T("  Baixando...");
             Thread t = new Thread(delegate()
             {
                 string file = null;
                 Exception err = null;
                 try
                 {
-                    file = Updater.Download(u, delegate(int pct) { SafeInvoke(delegate { btnUpdate.Text = "  Baixando " + pct + "%"; }); });
+                    file = Updater.Download(u, delegate(int pct) { SafeInvoke(delegate { btnUpdate.Text = L.T("  Baixando ") + pct + "%"; }); });
                 }
                 catch (Exception ex) { err = ex; }
                 SafeInvoke(delegate
@@ -268,7 +286,7 @@ namespace Dlss5Injector
                     {
                         try
                         {
-                            btnUpdate.Text = "  Instalando...";
+                            btnUpdate.Text = L.T("  Instalando...");
                             if (scanner != null) scanner.Cancel = true;
                             LibraryStore.Save(games);
                             Updater.ApplyAndRestart(file);
@@ -279,8 +297,8 @@ namespace Dlss5Injector
                     }
                     updating = false;
                     btnUpdate.Enabled = btnDismiss.Enabled = btnNotes.Enabled = true;
-                    btnUpdate.Text = "  Atualizar agora";
-                    MessageBox.Show(this, "A atualização falhou:\r\n" + err.Message + "\r\n\r\nVocê pode baixar a versão nova manualmente em \"Novidades\".",
+                    btnUpdate.Text = L.T("  Atualizar agora");
+                    MessageBox.Show(this, L.T("A atualização falhou:\r\n") + err.Message + L.T("\r\n\r\nVocê pode baixar a versão nova manualmente em \"Novidades\"."),
                         Program.AppName, MessageBoxButtons.OK, MessageBoxIcon.Error);
                 });
             });
@@ -308,6 +326,8 @@ namespace Dlss5Injector
             pageLib.Visible = i == 0;
             pageInj.Visible = i == 1;
             pageFg.Visible = i == 2;
+            pageCfg.Visible = i == 3;
+            if (i == 3) RefreshSettings();
             if (i == 2) RefreshFg();
         }
 
@@ -320,15 +340,15 @@ namespace Dlss5Injector
             using (Font f = Theme.Title(19f))
                 Theme.Draw(g, "5", f, Theme.Bg, new Rectangle(24, 18, 44, 44), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             using (Font f = Theme.Title(15f))
-                Theme.Draw(g, "DLSS 5 Definitive", f, Theme.Text, new Rectangle(80, 14, 240, 28), TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
+                Theme.Draw(g, L.T("DLSS 5 Definitive"), f, Theme.Text, new Rectangle(80, 14, 240, 28), TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
             using (Font f = Theme.F(8.5f))
             using (Font fb = Theme.F(8.5f, FontStyle.Bold))
             {
-                Theme.Draw(g, "criado por", f, Theme.Muted, new Rectangle(81, 41, 70, 20), TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
-                int w = TextRenderer.MeasureText("criado por", f).Width;
+                Theme.Draw(g, L.T("criado por"), f, Theme.Muted, new Rectangle(81, 41, 70, 20), TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
+                int w = TextRenderer.MeasureText(L.T("criado por"), f).Width;
                 Theme.Draw(g, Program.Author, fb, Theme.Accent, new Rectangle(76 + w, 41, 80, 20), TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
             }
-            string gpu = Gpu.Name.Replace("NVIDIA ", "") + "  ·  " + Gpu.SeriesText;
+            string gpu = Gpu.Name.Replace("NVIDIA ", "").Replace("GeForce ", "");
             using (Font f = Theme.F(8.5f, FontStyle.Bold))
             using (Font gf = Theme.Icon(10f))
             {
@@ -400,20 +420,20 @@ namespace Dlss5Injector
         void BuildLibrary()
         {
             Panel p = pageLib;
-            TextLabel(p, "Biblioteca", 24, 4, 300, 34, Theme.Title(16f), Theme.Text);
+            TextLabel(p, L.T("Biblioteca"), 24, 4, 300, 34, Theme.Title(16f), Theme.Text);
             lblLibCount = TextLabel(p, "", 26, 38, 380, 20, Theme.F(9f), Theme.Muted);
 
-            search = new SearchBox("Buscar jogo...");
+            search = new SearchBox(L.T("Buscar jogo..."));
             search.SetBounds(420, 12, 300, 38);
             search.Box.TextChanged += delegate { ApplyFilter(); };
             p.Controls.Add(search);
 
-            btnScan = new ModernButton("  Escanear PC", Theme.GSync, ButtonKind.Secondary);
+            btnScan = new ModernButton(L.T("  Escanear PC"), Theme.GSync, ButtonKind.Secondary);
             btnScan.SetBounds(732, 10, 172, 42);
             btnScan.Click += delegate { StartScan(null); };
             p.Controls.Add(btnScan);
 
-            btnAddFolder = new ModernButton("  Adicionar pasta", Theme.GFolder, ButtonKind.Primary);
+            btnAddFolder = new ModernButton(L.T("  Adicionar pasta"), Theme.GFolder, ButtonKind.Primary);
             btnAddFolder.Font = Theme.F(9.5f, FontStyle.Bold);
             btnAddFolder.SetBounds(914, 10, 182, 42);
             btnAddFolder.Click += delegate { AddFolder(); };
@@ -433,7 +453,7 @@ namespace Dlss5Injector
             grid.HandleCreated += delegate { Theme.DarkNative(grid, "DarkMode_Explorer"); };
             p.Controls.Add(grid);
 
-            lblEmpty = TextLabel(p, "Nenhum jogo ainda.\r\nClique em \"Escanear PC\" ou \"Adicionar pasta\".", 0, 330, 1120, 60, Theme.F(11f), Theme.Dim);
+            lblEmpty = TextLabel(p, L.T("Nenhum jogo ainda.\r\nClique em \"Escanear PC\" ou \"Adicionar pasta\"."), 0, 330, 1120, 60, Theme.F(11f), Theme.Dim);
             lblEmpty.TextAlign = ContentAlignment.MiddleCenter;
             lblEmpty.BringToFront();
 
@@ -442,9 +462,9 @@ namespace Dlss5Injector
             cardMenu.ShowImageMargin = false;
             cardMenu.BackColor = Theme.Field;
             cardMenu.Font = Theme.F(9.5f);
-            AddMenu("Configurar DLSS 5", delegate { if (menuCard != null) OpenGame(menuCard.Game); });
-            AddMenu("Abrir pasta do jogo", delegate { if (menuCard != null) Process.Start("explorer.exe", "\"" + menuCard.Game.Path + "\""); });
-            AddMenu("Buscar capa novamente", delegate
+            AddMenu(L.T("Configurar DLSS 5"), delegate { if (menuCard != null) OpenGame(menuCard.Game); });
+            AddMenu(L.T("Abrir pasta do jogo"), delegate { if (menuCard != null) Process.Start("explorer.exe", "\"" + menuCard.Game.Path + "\""); });
+            AddMenu(L.T("Buscar capa novamente"), delegate
             {
                 if (menuCard == null) return;
                 menuCard.Game.Cover = null;
@@ -452,7 +472,7 @@ namespace Dlss5Injector
                 if (menuCard.Game.Source != "Steam") menuCard.Game.AppId = null;
                 covers.Request(menuCard.Game);
             });
-            AddMenu("Remover da biblioteca", delegate { if (menuCard != null) RemoveGame(menuCard); });
+            AddMenu(L.T("Remover da biblioteca"), delegate { if (menuCard != null) RemoveGame(menuCard); });
         }
 
         void AddMenu(string text, EventHandler click)
@@ -533,7 +553,7 @@ namespace Dlss5Injector
         {
             int vis = cards.Values.Count(c => Matches(c.Game));
             int inst = games.Count(g => g.Installed);
-            lblLibCount.Text = games.Count + " jogo(s)" + (vis != games.Count ? "  ·  " + vis + " na busca" : "") + (inst > 0 ? "  ·  " + inst + " com DLSS 5" : "");
+            lblLibCount.Text = games.Count + L.T(" jogo(s)") + (vis != games.Count ? "  ·  " + vis + L.T(" na busca") : "") + (inst > 0 ? "  ·  " + inst + L.T(" com DLSS 5") : "");
             lblEmpty.Visible = games.Count == 0 && !scanning;
         }
 
@@ -607,7 +627,7 @@ namespace Dlss5Injector
                     SortGrid();
                     LibraryStore.Save(games);
                     int added = games.Count - before;
-                    lblScan.Text = "Escaneamento concluído · " + foundKeys.Count + " jogo(s) encontrados" + (added > 0 ? " · " + added + " novo(s)" : "") +
+                    lblScan.Text = L.T("Escaneamento concluído · ") + foundKeys.Count + L.T(" jogo(s) encontrados") + (added > 0 ? " · " + added + L.T(" novo(s)") : "") +
                                    "  ·  " + DateTime.Now.ToString("HH:mm");
                     UpdateLibCount();
                 });
@@ -642,7 +662,7 @@ namespace Dlss5Injector
         {
             using (FolderBrowserDialog d = new FolderBrowserDialog())
             {
-                d.Description = "Escolha uma pasta com jogos (ou a pasta de um jogo) para escanear";
+                d.Description = L.T("Escolha uma pasta com jogos (ou a pasta de um jogo) para escanear");
                 if (d.ShowDialog(this) != DialogResult.OK) return;
                 LibraryStore.AddCustomFolder(d.SelectedPath);
                 StartScan(d.SelectedPath);
@@ -676,7 +696,7 @@ namespace Dlss5Injector
             Panel P = pageInj;
             int o = 80; // coordenadas da tela inteira; a página começa abaixo do cabeçalho
 
-            Card cGame = AddCard(P, "1", "Jogo", 24, 84 - o, 528, 232);
+            Card cGame = AddCard(P, "1", L.T("Jogo"), 24, 84 - o, 528, 232);
             drop = new DropZone();
             drop.SetBounds(16, 52, 496, 96);
             drop.Click += delegate { if (!busy) Browse(); };
@@ -684,20 +704,20 @@ namespace Dlss5Injector
             drop.DragDrop += OnDragDrop;
             drop.DragLeave += delegate { drop.IsDragOver = false; drop.Invalidate(); };
             cGame.Controls.Add(drop);
-            Place(cGame, new FieldLabel("Executável"), 18, 158);
+            Place(cGame, new FieldLabel(L.T("Executável")), 18, 158);
             cmbExe = Combo(cGame, 16, 178, 496);
             cmbExe.SelectedIndexChanged += delegate { if (!loadingUi && cmbExe.SelectedIndex >= 0) AnalyzeExe(ExeFromItem(cmbExe.SelectedIndex)); };
 
-            Card cAn = AddCard(P, "2", "Análise do jogo", 24, 328 - o, 528, 268);
-            tApi = Tile(cAn, "API gráfica", Theme.GChip, 16, 52);
-            tEngine = Tile(cAn, "Engine", Theme.GGame, 268, 52);
-            tArch = Tile(cAn, "Arquitetura", Theme.GInfo, 16, 108);
-            tUpscale = Tile(cAn, "Upscalers do jogo", Theme.GSync, 268, 108);
+            Card cAn = AddCard(P, "2", L.T("Análise do jogo"), 24, 328 - o, 528, 268);
+            tApi = Tile(cAn, L.T("API gráfica"), Theme.GChip, 16, 52);
+            tEngine = Tile(cAn, L.T("Engine"), Theme.GGame, 268, 52);
+            tArch = Tile(cAn, L.T("Arquitetura"), Theme.GInfo, 16, 108);
+            tUpscale = Tile(cAn, L.T("Upscalers do jogo"), Theme.GSync, 268, 108);
             tAnti = Tile(cAn, "Anti-cheat", Theme.GWarn, 16, 164);
-            tMods = Tile(cAn, "Mods na pasta", Theme.GOpen, 268, 164);
+            tMods = Tile(cAn, L.T("Mods na pasta"), Theme.GOpen, 268, 164);
             lblNotes = TextLabel(cAn, "", 16, 220, 496, 42, Theme.F(8.5f), Theme.Muted);
 
-            Card cLog = AddCard(P, null, "Atividade", 24, 608 - o, 528, 120);
+            Card cLog = AddCard(P, null, L.T("Atividade"), 24, 608 - o, 528, 120);
             txtLog = new TextBox();
             txtLog.Multiline = true;
             txtLog.ReadOnly = true;
@@ -709,60 +729,60 @@ namespace Dlss5Injector
             txtLog.SetBounds(18, 44, 496, 68);
             cLog.Controls.Add(txtLog);
 
-            Card cCfg = AddCard(P, "3", "Configuração", 568, 84 - o, 528, 340);
-            Place(cCfg, new FieldLabel("Método (escolhido conforme a compatibilidade do jogo)"), 18, 50);
+            Card cCfg = AddCard(P, "3", L.T("Configuração"), 568, 84 - o, 528, 340);
+            Place(cCfg, new FieldLabel(L.T("Método (escolhido conforme a compatibilidade do jogo)")), 18, 50);
             cmbMethod = Combo(cCfg, 16, 70, 496);
             cmbMethod.SelectedIndexChanged += delegate { if (!loadingUi) RefreshPlan(); };
-            Place(cCfg, new FieldLabel("API gráfica"), 18, 114);
+            Place(cCfg, new FieldLabel(L.T("API gráfica")), 18, 114);
             cmbApi = Combo(cCfg, 16, 134, 240);
-            foreach (GfxApi a in ApiChoices) cmbApi.Items.Add(a == GfxApi.Unknown ? "Detectar automaticamente" : Planner.ApiName(a));
+            foreach (GfxApi a in ApiChoices) cmbApi.Items.Add(a == GfxApi.Unknown ? L.T("Detectar automaticamente") : Planner.ApiName(a));
             cmbApi.SelectedIndex = 0;
             cmbApi.SelectedIndexChanged += delegate { if (!loadingUi) RefreshMethods(); };
-            Place(cCfg, new FieldLabel("Passes do Neural Rendering"), 274, 114);
-            segPasses = new Segmented("1 passe", "2 passes", "3 passes");
+            Place(cCfg, new FieldLabel(L.T("Passes do Neural Rendering")), 274, 114);
+            segPasses = new Segmented(L.T("1 passe"), L.T("2 passes"), L.T("3 passes"));
             segPasses.SetBounds(272, 135, 240, 34);
             segPasses.SelectedChanged += delegate { RefreshPlan(); };
             cCfg.Controls.Add(segPasses);
 
-            btnFgLink = new ModernButton("  Frame Gen", "", ButtonKind.Secondary);
+            btnFgLink = new ModernButton(L.T("  Frame Gen"), "", ButtonKind.Secondary);
             btnFgLink.SetBounds(16, 180, 240, 30);
             btnFgLink.Font = Theme.F(9f);
             btnFgLink.Click += delegate { tabs.Selected = 2; };
             cCfg.Controls.Add(btnFgLink);
-            tgBefore = Toggle(cCfg, "NR antes do upscaler", true, 272, 180, 240);
-            tgUpdate = Toggle(cCfg, "Atualizar DLSS do jogo (310.9)", true, 16, 212, 240);
-            tgLog = Toggle(cCfg, "Log de diagnóstico", false, 272, 212, 240);
+            tgBefore = Toggle(cCfg, L.T("NR antes do upscaler"), true, 272, 180, 240);
+            tgUpdate = Toggle(cCfg, L.T("Atualizar DLSS do jogo (310.9)"), true, 16, 212, 240);
+            tgLog = Toggle(cCfg, L.T("Log de diagnóstico"), false, 272, 212, 240);
 
-            rowSl = new StatusRow("NVIDIA Streamline SDK");
+            rowSl = new StatusRow(L.T("NVIDIA Streamline SDK"));
             rowSl.SetBounds(16, 250, 400, 42);
             cCfg.Controls.Add(rowSl);
-            btnSl = new ModernButton("Alterar", null, ButtonKind.Ghost);
+            btnSl = new ModernButton(L.T("Alterar"), null, ButtonKind.Ghost);
             btnSl.SetBounds(430, 256, 82, 30);
             btnSl.Click += delegate { BrowseStreamline(); };
             cCfg.Controls.Add(btnSl);
 
-            rowNr = new StatusRow("Runtime DLSS 5 (nvngx_dlssnr.dll)");
+            rowNr = new StatusRow(L.T("Runtime DLSS 5 (nvngx_dlssnr.dll)"));
             rowNr.SetBounds(16, 292, 400, 42);
             cCfg.Controls.Add(rowNr);
-            btnNr = new ModernButton("Alterar", null, ButtonKind.Ghost);
+            btnNr = new ModernButton(L.T("Alterar"), null, ButtonKind.Ghost);
             btnNr.SetBounds(430, 298, 82, 30);
             btnNr.Click += delegate { BrowseNr(); };
             cCfg.Controls.Add(btnNr);
 
-            Card cPlan = AddCard(P, "4", "Plano de instalação", 568, 436 - o, 528, 292);
+            Card cPlan = AddCard(P, "4", L.T("Plano de instalação"), 568, 436 - o, 528, 292);
             steps = new StepsView();
             steps.SetBounds(18, 50, 496, 232);
             cPlan.Controls.Add(steps);
 
-            btnInstall = new ModernButton("  Instalar DLSS 5", Theme.GDownload, ButtonKind.Primary);
+            btnInstall = new ModernButton(L.T("  Instalar DLSS 5"), Theme.GDownload, ButtonKind.Primary);
             btnInstall.SetBounds(24, 744 - o, 240, 48);
             btnInstall.Click += delegate { DoInstall(); };
             P.Controls.Add(btnInstall);
-            btnUninstall = new ModernButton("  Remover", Theme.GDelete, ButtonKind.Secondary);
+            btnUninstall = new ModernButton(L.T("  Remover"), Theme.GDelete, ButtonKind.Secondary);
             btnUninstall.SetBounds(276, 744 - o, 136, 48);
             btnUninstall.Click += delegate { DoUninstall(); };
             P.Controls.Add(btnUninstall);
-            btnOpen = new ModernButton("  Abrir pasta", Theme.GOpen, ButtonKind.Secondary);
+            btnOpen = new ModernButton(L.T("  Abrir pasta"), Theme.GOpen, ButtonKind.Secondary);
             btnOpen.SetBounds(424, 744 - o, 128, 48);
             btnOpen.Click += delegate { if (game != null) Process.Start("explorer.exe", "\"" + game.ExeDir + "\""); };
             P.Controls.Add(btnOpen);
@@ -781,12 +801,12 @@ namespace Dlss5Injector
         void BuildFrameGen()
         {
             Panel P = pageFg;
-            Card c = AddCard(P, null, "Multi Frame Generation por IA  ·  NVIDIA DLSS 4", 24, 4, 700, 470);
-            TextLabel(c, "O modelo de IA do DLSS Frame Generation da NVIDIA gera até 5 quadros novos para cada quadro real — também em " +
-                    "jogos que não têm Frame Generation. O OptiScaler F5 entrega ao modelo os vetores de movimento do jogo ou, nos jogos " +
-                    "sem suporte, a profundidade e o movimento que ele mesmo calcula. Funciona nas RTX 50, 40, 30 e 20.",
+            Card c = AddCard(P, null, L.T("Multi Frame Generation por IA  ·  NVIDIA DLSS 4"), 24, 4, 700, 470);
+            TextLabel(c, L.T("O modelo de IA do DLSS Frame Generation da NVIDIA gera até 5 quadros novos para cada quadro real — também em ") +
+                    L.T("jogos que não têm Frame Generation. O OptiScaler F5 entrega ao modelo os vetores de movimento do jogo ou, nos jogos ") +
+                    L.T("sem suporte, a profundidade e o movimento que ele mesmo calcula. Funciona nas RTX 50, 40, 30 e 20."),
                     18, 48, 664, 54, Theme.F(9f), Theme.Muted);
-            Place(c, new FieldLabel("Multiplicador de quadros  (1X = desligado)"), 20, 108);
+            Place(c, new FieldLabel(L.T("Multiplicador de quadros  (1X = desligado)")), 20, 108);
             segFg = new Segmented("1X", "2X", "3X", "4X", "5X", "6X");
             segFg.Font = Theme.F(13f, FontStyle.Bold);
             segFg.Height = 56;
@@ -801,11 +821,11 @@ namespace Dlss5Injector
             timeline.SetBounds(18, 234, 664, 96);
             c.Controls.Add(timeline);
 
-            tgDyn = Toggle(c, "MFG dinâmico: varia de 2X a 6X para acompanhar o Hz do monitor (RTX 50)", Settings.Get("fgDyn") == "1", 18, 346, 664);
+            tgDyn = Toggle(c, L.T("MFG dinâmico: varia de 2X a 6X para acompanhar o Hz do monitor (RTX 50)"), Settings.Get("fgDyn") == "1", 18, 346, 664);
             tgDyn.CheckedChanged += delegate { Settings.Set("fgDyn", tgDyn.Checked ? "1" : "0"); RefreshPlan(); };
 
             lblFgGame = TextLabel(c, "", 18, 392, 440, 60, Theme.F(9f), Theme.Muted);
-            btnFgApply = new ModernButton("  Aplicar no jogo", Theme.GCheck, ButtonKind.Primary);
+            btnFgApply = new ModernButton(L.T("  Aplicar no jogo"), Theme.GCheck, ButtonKind.Primary);
             btnFgApply.SetBounds(472, 400, 210, 46);
             btnFgApply.Click += delegate
             {
@@ -814,33 +834,33 @@ namespace Dlss5Injector
             };
             c.Controls.Add(btnFgApply);
 
-            Card r = AddCard(P, null, "Sua GPU", 740, 4, 356, 470);
-            rowFgOut = Row(r, "Modelo de IA", 50);
-            rowFgMax = Row(r, "Multiplicador máximo", 100);
-            rowFgVec = Row(r, "Jogos com DLSS / FSR / XeSS", 150);
-            rowFgFlow = Row(r, "Jogos sem Frame Generation", 200);
-            rowFgMod = Row(r, "Componente extra", 250);
-            rowFgLat = Row(r, "Latência", 300);
-            TextLabel(r, "Dica: comece em 2X ou 3X. Para menos artefatos, tenha pelo menos 50–60 FPS reais antes de gerar quadros. " +
-                         "Desligue o V-Sync do jogo; aperte Insert no jogo para ajustar em tempo real.",
+            Card r = AddCard(P, null, L.T("Sua GPU"), 740, 4, 356, 470);
+            rowFgOut = Row(r, L.T("Modelo de IA"), 50);
+            rowFgMax = Row(r, L.T("Multiplicador máximo"), 100);
+            rowFgVec = Row(r, L.T("Jogos com DLSS / FSR / XeSS"), 150);
+            rowFgFlow = Row(r, L.T("Jogos sem Frame Generation"), 200);
+            rowFgMod = Row(r, L.T("Componente extra"), 250);
+            rowFgLat = Row(r, L.T("Latência"), 300);
+            TextLabel(r, L.T("Dica: comece em 2X ou 3X. Para menos artefatos, tenha pelo menos 50–60 FPS reais antes de gerar quadros. ") +
+                         L.T("Desligue o V-Sync do jogo; aperte Insert no jogo para ajustar em tempo real."),
                 18, 356, 320, 96, Theme.F(8.5f), Theme.Dim);
 
-            Card gen = AddCard(P, null, "Suporte por geração de GPU", 24, 486, 1072, 236);
-            rowGen50 = new StatusRow("GeForce RTX 50");
+            Card gen = AddCard(P, null, L.T("Suporte por geração de GPU"), 24, 486, 1072, 236);
+            rowGen50 = new StatusRow(L.T("GeForce RTX 50"));
             rowGen50.SetBounds(18, 50, 336, 46);
             gen.Controls.Add(rowGen50);
-            rowGen40 = new StatusRow("GeForce RTX 40");
+            rowGen40 = new StatusRow(L.T("GeForce RTX 40"));
             rowGen40.SetBounds(368, 50, 336, 46);
             gen.Controls.Add(rowGen40);
-            rowGen30 = new StatusRow("GeForce RTX 30 / RTX 20");
+            rowGen30 = new StatusRow(L.T("GeForce RTX 30 / RTX 20"));
             rowGen30.SetBounds(718, 50, 336, 46);
             gen.Controls.Add(rowGen30);
             TextLabel(gen,
-                "RTX 50 — DLSS 4 Multi Frame Generation nativo, 2X a 6X, ou modo dinâmico (acompanha o Hz do monitor).\r\n" +
-                "RTX 40 — DLSS Frame Generation 2X nativo; 3X e 4X pelo desbloqueio de MFG embutido no OptiScaler F5 (experimental, sem arquivo extra).\r\n" +
-                "RTX 30 / 20 — DLSS Multi Frame Generation até 4X pelo dlssg_for_sm86 (sdli1995, GPLv3), baixado automaticamente do GitHub na instalação. " +
-                "Ele usa o runtime oficial da NVIDIA (nvngx_dlssg 310.9.16, assinatura conferida). Requer DX12 (ou DX9 via dgVoodoo); experimental.\r\n" +
-                "Jogos sem Frame Generation próprio recebem o MFG pelo OptiScaler; jogos que já têm recebem o multiplicador forçado no FG do próprio jogo.",
+                L.T("RTX 50 — DLSS 4 Multi Frame Generation nativo, 2X a 6X, ou modo dinâmico (acompanha o Hz do monitor).\r\n") +
+                L.T("RTX 40 — DLSS Frame Generation 2X nativo; 3X e 4X pelo desbloqueio de MFG embutido no OptiScaler F5 (experimental, sem arquivo extra).\r\n") +
+                L.T("RTX 30 / 20 — DLSS Multi Frame Generation até 4X pelo dlssg_for_sm86 (sdli1995, GPLv3), baixado automaticamente do GitHub na instalação. ") +
+                L.T("Ele usa o runtime oficial da NVIDIA (nvngx_dlssg 310.9.16, assinatura conferida). Requer DX12 (ou DX9 via dgVoodoo); experimental.\r\n") +
+                L.T("Jogos sem Frame Generation próprio recebem o MFG pelo OptiScaler; jogos que já têm recebem o multiplicador forçado no FG do próprio jogo."),
                 18, 108, 1036, 120, Theme.F(9f), Theme.Muted);
         }
 
@@ -868,39 +888,39 @@ namespace Dlss5Injector
             Planner.FgOutput(api, out cap, out label);
             int eff = Math.Min(mult, cap);
             timeline.Set(dyn ? 4 : eff, dyn);
-            if (dyn) lblFgFps.Text = "Dinâmico: 2X a 6X conforme o Hz do monitor";
-            else if (mult == 1) lblFgFps.Text = "Desligado — só quadros reais";
-            else lblFgFps.Text = "60 FPS reais  →  até " + (60 * eff) + " FPS na tela" + (eff < mult ? "   (limitado a " + cap + "X)" : "");
+            if (dyn) lblFgFps.Text = L.T("Dinâmico: 2X a 6X conforme o Hz do monitor");
+            else if (mult == 1) lblFgFps.Text = L.T("Desligado — só quadros reais");
+            else lblFgFps.Text = L.T("60 FPS reais  →  até ") + (60 * eff) + L.T(" FPS na tela") + (eff < mult ? L.T("   (limitado a ") + cap + L.T("X)") : "");
 
             bool nvAi = label.StartsWith("NVIDIA");
             rowFgOut.Set(nvAi ? Theme.GCheck : Theme.GInfo, nvAi ? Theme.Accent : Theme.Warn, label);
             rowFgMax.Set(cap >= 6 ? Theme.GCheck : Theme.GInfo, cap >= 6 ? Theme.Accent : Theme.Info,
-                cap + "X" + (Gpu.Series == 40 ? "  (3X–4X: desbloqueio experimental)" : Gpu.Series == 30 || Gpu.Series == 20 ? "  (experimental)" : ""));
-            rowFgVec.Set(Theme.GCheck, Theme.Accent, "Usa os vetores de movimento do jogo");
-            rowFgFlow.Set(Theme.GCheck, Theme.Accent, "Liberado pelo OptiScaler F5");
-            if (Gpu.IsNvidia && Gpu.Series >= 50) rowFgMod.Set(Theme.GCheck, Theme.Accent, "Nenhum — suporte nativo");
-            else if (Gpu.IsNvidia && Gpu.Series == 40) rowFgMod.Set(Theme.GCheck, Theme.Accent, "Desbloqueio MFG embutido no OptiScaler F5");
+                cap + "X" + (Gpu.Series == 40 ? L.T("  (3X–4X: desbloqueio experimental)") : Gpu.Series == 30 || Gpu.Series == 20 ? L.T("  (experimental)") : ""));
+            rowFgVec.Set(Theme.GCheck, Theme.Accent, L.T("Usa os vetores de movimento do jogo"));
+            rowFgFlow.Set(Theme.GCheck, Theme.Accent, L.T("Liberado pelo OptiScaler F5"));
+            if (Gpu.IsNvidia && Gpu.Series >= 50) rowFgMod.Set(Theme.GCheck, Theme.Accent, L.T("Nenhum — suporte nativo"));
+            else if (Gpu.IsNvidia && Gpu.Series == 40) rowFgMod.Set(Theme.GCheck, Theme.Accent, L.T("Desbloqueio MFG embutido no OptiScaler F5"));
             else if (Gpu.IsNvidia && Gpu.Series >= 20)
             {
                 bool cached = Directory.Exists(Path.Combine(AppPaths.Cache, "dlssg_for_sm86"));
                 rowFgMod.Set(cached ? Theme.GCheck : Theme.GDownload, cached ? Theme.Accent : Theme.Info,
-                    cached ? "dlssg_for_sm86 já baixado" : "dlssg_for_sm86 — baixado na instalação");
+                    cached ? L.T("dlssg_for_sm86 já baixado") : L.T("dlssg_for_sm86 — baixado na instalação"));
             }
-            else rowFgMod.Set(Theme.GInfo, Theme.Warn, "DLSS-G exige NVIDIA RTX — usando XeSS-FG");
-            rowFgLat.Set(Theme.GInfo, Theme.Info, Gpu.IsNvidia ? "NVIDIA Reflex reduz a latência extra" : "XeLL / Anti-Lag reduzem a latência extra");
+            else rowFgMod.Set(Theme.GInfo, Theme.Warn, L.T("DLSS-G exige NVIDIA RTX — usando XeSS-FG"));
+            rowFgLat.Set(Theme.GInfo, Theme.Info, Gpu.IsNvidia ? L.T("NVIDIA Reflex reduz a latência extra") : L.T("XeLL / Anti-Lag reduzem a latência extra"));
 
             StatusRow mine = Gpu.Series >= 50 ? rowGen50 : Gpu.Series == 40 ? rowGen40 : Gpu.Series >= 20 ? rowGen30 : null;
-            rowGen50.Set(mine == rowGen50 ? Theme.GCheck : Theme.GChip, mine == rowGen50 ? Theme.Accent : Theme.Muted, "Até 6X · dinâmico" + (mine == rowGen50 ? " · sua GPU" : ""));
-            rowGen40.Set(mine == rowGen40 ? Theme.GCheck : Theme.GChip, mine == rowGen40 ? Theme.Accent : Theme.Muted, "Até 4X (desbloqueio)" + (mine == rowGen40 ? " · sua GPU" : ""));
-            rowGen30.Set(mine == rowGen30 ? Theme.GCheck : Theme.GChip, mine == rowGen30 ? Theme.Accent : Theme.Muted, "Até 4X (dlssg_for_sm86)" + (mine == rowGen30 ? " · sua GPU" : ""));
+            rowGen50.Set(mine == rowGen50 ? Theme.GCheck : Theme.GChip, mine == rowGen50 ? Theme.Accent : Theme.Muted, L.T("Até 6X · dinâmico") + (mine == rowGen50 ? L.T(" · sua GPU") : ""));
+            rowGen40.Set(mine == rowGen40 ? Theme.GCheck : Theme.GChip, mine == rowGen40 ? Theme.Accent : Theme.Muted, L.T("Até 4X (desbloqueio)") + (mine == rowGen40 ? L.T(" · sua GPU") : ""));
+            rowGen30.Set(mine == rowGen30 ? Theme.GCheck : Theme.GChip, mine == rowGen30 ? Theme.Accent : Theme.Muted, L.T("Até 4X (dlssg_for_sm86)") + (mine == rowGen30 ? L.T(" · sua GPU") : ""));
 
             lblFgGame.Text = game == null
-                ? "Nenhum jogo selecionado. Escolha um na Biblioteca para aplicar."
-                : "Jogo: " + game.ExeName + "  ·  " + Planner.ApiName(SelectedApi()) +
-                  (game.Ours != null ? "\r\n\"Aplicar\" reinstala com o novo multiplicador." : "\r\n\"Aplicar\" instala o DLSS 5 com este Frame Gen.");
-            btnFgApply.Text = game == null ? "  Ir para a Biblioteca" : "  Aplicar no jogo";
+                ? L.T("Nenhum jogo selecionado. Escolha um na Biblioteca para aplicar.")
+                : L.T("Jogo: ") + game.ExeName + "  ·  " + Planner.ApiName(SelectedApi()) +
+                  (game.Ours != null ? L.T("\r\n\"Aplicar\" reinstala com o novo multiplicador.") : L.T("\r\n\"Aplicar\" instala o DLSS 5 com este Frame Gen."));
+            btnFgApply.Text = game == null ? L.T("  Ir para a Biblioteca") : L.T("  Aplicar no jogo");
             btnFgApply.Enabled = !busy;
-            btnFgLink.Text = "  Frame Gen: " + (dyn ? "dinâmico" : mult == 1 ? "desligado" : eff + "X") + "  ›";
+            btnFgLink.Text = L.T("  Frame Gen: ") + (dyn ? L.T("dinâmico") : mult == 1 ? L.T("desligado") : eff + "X") + "  ›";
         }
 
         // ================================================================ helpers gerais
@@ -942,9 +962,9 @@ namespace Dlss5Injector
                     Busy(false, null);
                     if (err != null)
                     {
-                        Log("ERRO: " + err.Message);
+                        Log(L.T("ERRO: ") + err.Message);
                         lblStatus.ForeColor = Theme.Danger;
-                        lblStatus.Text = "Erro: " + err.Message;
+                        lblStatus.Text = L.T("Erro: ") + err.Message;
                         MessageBox.Show(this, err.Message, Program.AppName, MessageBoxButtons.OK, MessageBoxIcon.Error);
                     }
                     else if (done != null) done();
@@ -989,18 +1009,180 @@ namespace Dlss5Injector
                 rowSl.Set(Theme.GCheck, Theme.Accent, "Streamline " + Util.FileVerStr(Path.Combine(b, "sl.interposer.dll")) +
                     "  ·  DLSS " + Util.FileVerStr(Path.Combine(b, "nvngx_dlss.dll")) + "  ·  " + Path.GetFileName(slDir));
             }
-            else rowSl.Set(Theme.GDownload, Theme.Info, "Será baixado da NVIDIA (GitHub oficial) na instalação");
+            else rowSl.Set(Theme.GDownload, Theme.Info, L.T("Será baixado da NVIDIA (GitHub oficial) na instalação"));
+            if (rowSlCfg != null) rowSlCfg.Set(rowSl.Glyph, rowSl.Accent, rowSl.Detail);
+        }
+
+        /// <summary>A linha da runtime do DLSS 5 aparece no Injetor e em Configurações.</summary>
+        void SetNrRow(string glyph, Color accent, string text)
+        {
+            rowNr.Set(glyph, accent, text);
+            if (rowNrCfg != null) rowNrCfg.Set(glyph, accent, text);
+        }
+
+        // ================================================================ CONFIGURAÇÕES
+
+        void BuildSettings()
+        {
+            Panel P = pageCfg;
+
+            // ---- Idioma
+            Card cLang = AddCard(P, null, L.T("Idioma"), 24, 4, 528, 196);
+            Place(cLang, new FieldLabel(L.T("Idioma do aplicativo")), 18, 50);
+            cmbLang = Combo(cLang, 16, 70, 496);
+            cmbLang.Items.Add(L.T("Automático (idioma do Windows: ") + L.NativeName(L.SystemLang()) + ")");
+            cmbLang.Items.Add(L.NativeName("pt"));
+            cmbLang.Items.Add(L.NativeName("en"));
+            cmbLang.Items.Add(L.NativeName("es"));
+            langLoading = true;
+            cmbLang.SelectedIndex = Array.IndexOf(L.Codes, L.Setting);
+            langLoading = false;
+            cmbLang.SelectedIndexChanged += delegate { if (!langLoading) ChangeLanguage(L.Codes[cmbLang.SelectedIndex]); };
+            TextLabel(cLang, L.T("O app reinicia para aplicar o novo idioma."), 18, 118, 492, 40, Theme.F(9f), Theme.Muted);
+
+            // ---- Atualizações
+            Card cUpd = AddCard(P, null, L.T("Atualizações"), 24, 212, 528, 220);
+            rowUpd = new StatusRow(L.T("Versão instalada"));
+            rowUpd.SetBounds(16, 50, 330, 46);
+            cUpd.Controls.Add(rowUpd);
+            ModernButton btnCheck = new ModernButton(L.T("  Verificar agora"), Theme.GSync, ButtonKind.Secondary);
+            btnCheck.SetBounds(352, 56, 160, 36);
+            btnCheck.Click += delegate { if (pendingUpdate != null) DoUpdate(); else CheckForUpdates(true); };
+            cUpd.Controls.Add(btnCheck);
+            tgAutoUpd = Toggle(cUpd, L.T("Verificar atualizações automaticamente (ao abrir e a cada 6 h)"), Settings.Get("autoUpdate") != "0", 16, 112, 496);
+            tgAutoUpd.CheckedChanged += delegate { Settings.Set("autoUpdate", tgAutoUpd.Checked ? "1" : "0"); };
+            UpdateUpdRow(null, null);
+
+            // ---- Arquivos do DLSS
+            Card cFiles = AddCard(P, null, L.T("Arquivos do DLSS"), 568, 4, 528, 196);
+            rowSlCfg = new StatusRow(L.T("NVIDIA Streamline SDK"));
+            rowSlCfg.SetBounds(16, 52, 400, 42);
+            cFiles.Controls.Add(rowSlCfg);
+            ModernButton b1 = new ModernButton(L.T("Alterar"), null, ButtonKind.Ghost);
+            b1.SetBounds(430, 58, 82, 30);
+            b1.Click += delegate { BrowseStreamline(); };
+            cFiles.Controls.Add(b1);
+            rowNrCfg = new StatusRow(L.T("Runtime DLSS 5 (nvngx_dlssnr.dll)"));
+            rowNrCfg.SetBounds(16, 112, 400, 42);
+            cFiles.Controls.Add(rowNrCfg);
+            ModernButton b2 = new ModernButton(L.T("Alterar"), null, ButtonKind.Ghost);
+            b2.SetBounds(430, 118, 82, 30);
+            b2.Click += delegate { BrowseNr(); };
+            cFiles.Controls.Add(b2);
+
+            // ---- Dados do aplicativo
+            Card cData = AddCard(P, null, L.T("Dados do aplicativo"), 568, 212, 528, 220);
+            lblData = TextLabel(cData, "", 18, 48, 492, 92, Theme.F(9f), Theme.Muted);
+            lblData.AutoEllipsis = true;
+            ModernButton bOpen = new ModernButton(L.T("  Abrir pasta de dados"), Theme.GOpen, ButtonKind.Secondary);
+            bOpen.SetBounds(16, 156, 240, 40);
+            bOpen.Click += delegate { Process.Start("explorer.exe", "\"" + AppPaths.Root + "\""); };
+            cData.Controls.Add(bOpen);
+            ModernButton bClear = new ModernButton(L.T("  Limpar downloads"), Theme.GDelete, ButtonKind.Secondary);
+            bClear.SetBounds(268, 156, 244, 40);
+            bClear.Click += delegate { ClearDownloads(); };
+            cData.Controls.Add(bClear);
+
+            // ---- Sobre
+            Card cAbout = AddCard(P, null, L.T("Sobre"), 24, 444, 1072, 220);
+            TextLabel(cAbout, Program.AppName + "  " + Program.Version + "  —  " + L.T("criado por") + " " + Program.Author,
+                18, 48, 1036, 28, Theme.F(12f, FontStyle.Bold), Theme.Accent);
+            TextLabel(cAbout, L.T("DLSS 5 Neural Rendering e Multi Frame Generation por IA para DX12, DX11, Vulkan, DX10 e DX9."),
+                18, 80, 1036, 24, Theme.F(9.5f), Theme.Text);
+            TextLabel(cAbout, L.T("Componentes de terceiros: OptiScaler F5 (janblade), NVIDIA Streamline, dlssg_for_sm86 (sdli1995), RenoDX, ReShade, DXVK e dgVoodoo2 — cada um com a própria licença."),
+                18, 108, 1036, 40, Theme.F(9f), Theme.Muted);
+            ModernButton bGit = new ModernButton(L.T("  Página no GitHub"), Theme.GOpen, ButtonKind.Secondary);
+            bGit.SetBounds(16, 160, 220, 40);
+            bGit.Click += delegate { Process.Start("https://github.com/" + Updater.Repo); };
+            cAbout.Controls.Add(bGit);
+            ModernButton bLic = new ModernButton(L.T("  Créditos e licenças"), Theme.GInfo, ButtonKind.Secondary);
+            bLic.SetBounds(248, 160, 240, 40);
+            bLic.Click += delegate { Process.Start("https://github.com/" + Updater.Repo + "#créditos"); };
+            cAbout.Controls.Add(bLic);
+        }
+
+        void RefreshSettings()
+        {
+            if (lblData == null) return;
+            string mode = AppPaths.IsPortable ? L.T("Portable (dados ao lado do exe)")
+                        : Updater.IsInstalledCopy ? L.T("Instalado") : L.T("Executando fora da pasta instalada");
+            long bytes = 0;
+            try
+            {
+                foreach (string d in Directory.GetDirectories(AppPaths.Cache))
+                {
+                    if (Path.GetFileName(d).Equals("covers", StringComparison.OrdinalIgnoreCase)) continue;
+                    foreach (string f in Directory.GetFiles(d, "*", SearchOption.AllDirectories)) bytes += new FileInfo(f).Length;
+                }
+            }
+            catch { }
+            lblData.Text = L.T("Modo: ") + mode + "\r\n" + AppPaths.Root + "\r\n" + L.T("Downloads em cache: ") + (bytes / 1048576) + " MB";
+        }
+
+        void UpdateUpdRow(UpdateInfo info, Exception err)
+        {
+            if (rowUpd == null) return;
+            string last = Settings.Get("lastUpdateCheck");
+            if (info != null)
+                rowUpd.Set(Theme.GDownload, Theme.Warn, "v" + Program.Version + "  ·  " + L.T("Nova versão disponível: ") + info.Tag);
+            else if (err != null)
+                rowUpd.Set(Theme.GError, Theme.Danger, "v" + Program.Version + "  ·  " + err.Message);
+            else if (!string.IsNullOrEmpty(last))
+                rowUpd.Set(Theme.GCheck, Theme.Accent, "v" + Program.Version + "  ·  " + L.T("Você está na versão mais recente") + "  (" + last + ")");
+            else
+                rowUpd.Set(Theme.GInfo, Theme.Info, "v" + Program.Version + "  ·  " + L.T("Ainda não verificado"));
+        }
+
+        void ChangeLanguage(string code)
+        {
+            Settings.Set("lang", code);
+            string newCode = code == "auto" ? L.SystemLang() : code;
+            if (newCode == L.Code) return;
+            // Pergunta no idioma novo, que é o que a pessoa escolheu
+            string old = L.Code;
+            L.Code = newCode;
+            string q = L.T("Reiniciar o DLSS 5 Definitive agora para aplicar o idioma?");
+            L.Code = old;
+            if (busy || updating) return;
+            if (MessageBox.Show(this, q, Program.AppName, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            try
+            {
+                if (scanner != null) scanner.Cancel = true;
+                LibraryStore.Save(games);
+                ProcessStartInfo psi = new ProcessStartInfo(Application.ExecutablePath);
+                psi.WorkingDirectory = Path.GetDirectoryName(Application.ExecutablePath);
+                psi.UseShellExecute = true;
+                Process.Start(psi);
+                Application.Exit();
+            }
+            catch { }
+        }
+
+        void ClearDownloads()
+        {
+            if (busy || updating) return;
+            if (MessageBox.Show(this, L.T("Apagar os downloads em cache (OptiScaler, Streamline, DXVK...)? Eles são baixados de novo quando necessário. As capas e a biblioteca são mantidas."),
+                    Program.AppName, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            foreach (string d in Directory.GetDirectories(AppPaths.Cache))
+            {
+                if (Path.GetFileName(d).Equals("covers", StringComparison.OrdinalIgnoreCase)) continue;
+                try { Directory.Delete(d, true); } catch { }
+            }
+            // A pasta do Streamline baixado pelo app pode ter sido apagada
+            if (!Installer.IsStreamlineDir(slDir)) { slDir = FindStreamline(); UpdateSlRow(); }
+            RefreshSettings();
+            MessageBox.Show(this, L.T("✔ Downloads em cache apagados."), Program.AppName);
         }
 
         void BrowseStreamline()
         {
             using (FolderBrowserDialog d = new FolderBrowserDialog())
             {
-                d.Description = "Pasta do NVIDIA Streamline SDK (contém bin\\x64)";
+                d.Description = L.T("Pasta do NVIDIA Streamline SDK (contém bin\\x64)");
                 if (d.ShowDialog(this) != DialogResult.OK) return;
                 if (!Installer.IsStreamlineDir(d.SelectedPath))
                 {
-                    MessageBox.Show(this, "Essa pasta não tem bin\\x64\\nvngx_dlss.dll e sl.interposer.dll.", Program.AppName);
+                    MessageBox.Show(this, L.T("Essa pasta não tem bin\\x64\\nvngx_dlss.dll e sl.interposer.dll."), Program.AppName);
                     return;
                 }
                 slDir = d.SelectedPath;
@@ -1014,7 +1196,7 @@ namespace Dlss5Injector
             using (OpenFileDialog d = new OpenFileDialog())
             {
                 d.Filter = "nvngx_dlssnr.dll|nvngx_dlssnr.dll|DLL|*.dll";
-                d.Title = "Selecione a runtime do DLSS 5 (nvngx_dlssnr.dll)";
+                d.Title = L.T("Selecione a runtime do DLSS 5 (nvngx_dlssnr.dll)");
                 if (d.ShowDialog(this) == DialogResult.OK) SetNr(d.FileName, true);
             }
         }
@@ -1025,13 +1207,13 @@ namespace Dlss5Injector
             nrPath = path;
             if (string.IsNullOrEmpty(path) || !File.Exists(path))
             {
-                rowNr.Set(Theme.GError, Theme.Danger, "Não encontrado — clique em Alterar e selecione o arquivo");
+                SetNrRow(Theme.GError, Theme.Danger, L.T("Não encontrado — clique em Alterar e selecione o arquivo"));
                 RefreshPlan();
                 return;
             }
             Settings.Set("nr", path);
             if (manual) Settings.Set("nrManual", "1");
-            rowNr.Set(Theme.GSync, Theme.Info, "Verificando assinatura e SHA-256...");
+            SetNrRow(Theme.GSync, Theme.Info, L.T("Verificando assinatura e SHA-256..."));
             Thread t = new Thread(delegate()
             {
                 NrRuntime.Info info = null;
@@ -1040,9 +1222,9 @@ namespace Dlss5Injector
                 {
                     if (nrPath != path) return;
                     nrInfo = info;
-                    if (info == null) rowNr.Set(Theme.GError, Theme.Danger, "Não foi possível ler o arquivo");
-                    else if (info.Warning == null) rowNr.Set(Theme.GCheck, Theme.Accent, info.Label + "  ·  compatível com sua GPU");
-                    else rowNr.Set(Theme.GWarn, Theme.Warn, info.Label + "  ·  veja o aviso no plano");
+                    if (info == null) SetNrRow(Theme.GError, Theme.Danger, L.T("Não foi possível ler o arquivo"));
+                    else if (info.Warning == null) SetNrRow(Theme.GCheck, Theme.Accent, info.Label + L.T("  ·  compatível com sua GPU"));
+                    else SetNrRow(Theme.GWarn, Theme.Warn, info.Label + L.T("  ·  veja o aviso no plano"));
                     RefreshPlan();
                 });
             });
@@ -1077,7 +1259,7 @@ namespace Dlss5Injector
         {
             using (FolderBrowserDialog d = new FolderBrowserDialog())
             {
-                d.Description = "Selecione a pasta de instalação do jogo";
+                d.Description = L.T("Selecione a pasta de instalação do jogo");
                 string last = Settings.Get("lastFolder");
                 if (!string.IsNullOrEmpty(folder) && Directory.Exists(folder)) d.SelectedPath = folder;
                 else if (!string.IsNullOrEmpty(last) && Directory.Exists(last)) d.SelectedPath = last;
@@ -1098,7 +1280,7 @@ namespace Dlss5Injector
             drop.Sub = folder;
             drop.Invalidate();
             List<string> exes = null;
-            RunBg("Procurando executáveis...", delegate { exes = GameScanner.FindExes(folder); }, delegate
+            RunBg(L.T("Procurando executáveis..."), delegate { exes = GameScanner.FindExes(folder); }, delegate
             {
                 exeList = exes;
                 loadingUi = true;
@@ -1110,7 +1292,7 @@ namespace Dlss5Injector
                 {
                     game = null;
                     ShowAnalysis();
-                    lblNotes.Text = "Nenhum .exe encontrado nessa pasta.";
+                    lblNotes.Text = L.T("Nenhum .exe encontrado nessa pasta.");
                     RefreshMethods();
                     return;
                 }
@@ -1132,8 +1314,8 @@ namespace Dlss5Injector
             if (exe == null || busy) return;
             GameInfo g = null;
             string root = folder;
-            Log("Analisando " + Path.GetFileName(exe));
-            RunBg("Analisando o jogo...", delegate { g = GameScanner.Analyze(root, exe); }, delegate
+            Log(L.T("Analisando ") + Path.GetFileName(exe));
+            RunBg(L.T("Analisando o jogo..."), delegate { g = GameScanner.Analyze(root, exe); }, delegate
             {
                 game = g;
                 ShowAnalysis();
@@ -1141,7 +1323,7 @@ namespace Dlss5Injector
                 cmbApi.SelectedIndex = 0;
                 loadingUi = false;
                 RefreshMethods();
-                lblStatus.Text = g.Ours != null ? "DLSS 5 Definitive já está instalado neste jogo (" + g.Ours.Method + ")." : "Análise concluída.";
+                lblStatus.Text = g.Ours != null ? L.T("DLSS 5 Definitive já está instalado neste jogo (") + g.Ours.Method + ")." : L.T("Análise concluída.");
             });
         }
 
@@ -1157,23 +1339,23 @@ namespace Dlss5Injector
             bool apiOk = g.Api != GfxApi.Unknown && g.Api != GfxApi.OpenGL;
             tApi.Set(Planner.ApiName(g.Api), apiOk ? Theme.Accent : Theme.Danger);
             tEngine.Set(g.Engine, Theme.Info);
-            tArch.Set(!g.PeValid ? "Inválido" : g.Is64 ? "64-bit" : "32-bit (não suportado)", g.PeValid && g.Is64 ? Theme.Accent : Theme.Danger);
+            tArch.Set(!g.PeValid ? L.T("Inválido") : g.Is64 ? "64-bit" : L.T("32-bit (não suportado)"), g.PeValid && g.Is64 ? Theme.Accent : Theme.Danger);
             List<string> up = new List<string>();
             if (g.HasDlss) up.Add("DLSS");
             if (g.HasDlssD) up.Add("RR");
             if (g.HasDlssG) up.Add("DLSS-FG");
             if (g.HasFsr) up.Add("FSR");
             if (g.HasXess) up.Add("XeSS");
-            tUpscale.Set(up.Count == 0 ? "Nenhum · Optical F5Low" : string.Join(" · ", up.ToArray()), up.Count == 0 ? Theme.Muted : Theme.Accent);
-            tAnti.Set(g.AntiCheat ?? "Nenhum detectado", g.AntiCheat == null ? Theme.Accent : Theme.Danger);
+            tUpscale.Set(up.Count == 0 ? L.T("Nenhum · Optical F5Low") : string.Join(" · ", up.ToArray()), up.Count == 0 ? Theme.Muted : Theme.Accent);
+            tAnti.Set(g.AntiCheat ?? L.T("Nenhum detectado"), g.AntiCheat == null ? Theme.Accent : Theme.Danger);
             List<string> mods = new List<string>();
             foreach (string m in g.Mods) if (!m.Contains("Microsoft (original)")) mods.Add(m.Split(' ')[0]);
-            tMods.Set(mods.Count == 0 ? "Nenhum" : string.Join(", ", mods.ToArray()), g.Ours != null ? Theme.Accent : mods.Count == 0 ? Theme.Muted : Theme.Warn);
+            tMods.Set(mods.Count == 0 ? L.T("Nenhum") : string.Join(", ", mods.ToArray()), g.Ours != null ? Theme.Accent : mods.Count == 0 ? Theme.Muted : Theme.Warn);
 
             List<string> notes = new List<string>();
-            notes.Add("Detecção: " + g.ApiSource + ".");
+            notes.Add(L.T("Detecção: ") + g.ApiSource + ".");
             notes.AddRange(g.ApiNotes);
-            if (g.Ours != null) notes.Add("Já instalado — instalar de novo substitui; Remover restaura o original.");
+            if (g.Ours != null) notes.Add(L.T("Já instalado — instalar de novo substitui; Remover restaura o original."));
             lblNotes.Text = string.Join("  ", notes.ToArray());
         }
 
@@ -1194,7 +1376,7 @@ namespace Dlss5Injector
             {
                 methods = Planner.Candidates(game, SelectedApi(), out methodWhy);
                 for (int i = 0; i < methods.Count; i++)
-                    cmbMethod.Items.Add((i == 0 ? "★ Recomendado: " : "Alternativa: ") + Planner.Name(methods[i]));
+                    cmbMethod.Items.Add((i == 0 ? L.T("★ Recomendado: ") : L.T("Alternativa: ")) + Planner.Name(methods[i]));
                 if (methods.Count > 0) cmbMethod.SelectedIndex = 0;
             }
             loadingUi = false;
@@ -1226,7 +1408,7 @@ namespace Dlss5Injector
             InstallPlan p = CurrentPlan();
             if (p == null)
             {
-                steps.SetContent(null, null, null, game == null ? "Escolha um jogo na Biblioteca ou arraste a pasta dele para cá." : "Nenhum método compatível. " + methodWhy);
+                steps.SetContent(null, null, null, game == null ? L.T("Escolha um jogo na Biblioteca ou arraste a pasta dele para cá.") : L.T("Nenhum método compatível. ") + methodWhy);
                 btnInstall.Enabled = false;
                 return;
             }
@@ -1237,10 +1419,10 @@ namespace Dlss5Injector
             tgLog.Enabled = opti;
 
             string header = Planner.Name(p.Method) + "  ·  " + Planner.ApiName(p.Api);
-            if (cmbMethod.SelectedIndex == 0 && !string.IsNullOrEmpty(methodWhy)) header += "\r\n" + methodWhy;
+            if (cmbMethod.SelectedIndex == 0 && !string.IsNullOrEmpty(methodWhy)) header += L.T("\r\n") + methodWhy;
             List<string> warns = new List<string>(p.Warnings);
             if (nrInfo != null && nrInfo.Warning != null) warns.Add(nrInfo.Warning);
-            if (string.IsNullOrEmpty(nrPath) || !File.Exists(nrPath)) warns.Add("Falta a runtime do DLSS 5 (nvngx_dlssnr.dll): use Alterar na seção 3.");
+            if (string.IsNullOrEmpty(nrPath) || !File.Exists(nrPath)) warns.Add(L.T("Falta a runtime do DLSS 5 (nvngx_dlssnr.dll): use Alterar na seção 3."));
             steps.SetContent(header, p.Steps, warns, null);
         }
 
@@ -1251,13 +1433,13 @@ namespace Dlss5Injector
             if (string.IsNullOrEmpty(nrPath) || !File.Exists(nrPath))
             {
                 tabs.Selected = 1;
-                MessageBox.Show(this, "Falta a runtime do DLSS 5: nvngx_dlssnr.dll.\r\n\r\nEla não vem no OptiScaler, no RenoDX nem no Streamline SDK. " +
-                    "Use o botão Alterar ao lado de \"Runtime DLSS 5\".", Program.AppName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(this, L.T("Falta a runtime do DLSS 5: nvngx_dlssnr.dll.\r\n\r\nEla não vem no OptiScaler, no RenoDX nem no Streamline SDK. ") +
+                    L.T("Use o botão Alterar ao lado de \"Runtime DLSS 5\"."), Program.AppName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
             if (!Util.CanWrite(game.ExeDir))
             {
-                if (MessageBox.Show(this, "Sem permissão para gravar em:\r\n" + game.ExeDir + "\r\n\r\nReiniciar o programa como administrador?", Program.AppName,
+                if (MessageBox.Show(this, L.T("Sem permissão para gravar em:\r\n") + game.ExeDir + L.T("\r\n\r\nReiniciar o programa como administrador?"), Program.AppName,
                     MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
                 {
                     try
@@ -1272,10 +1454,10 @@ namespace Dlss5Injector
                 }
                 return;
             }
-            string msg = "Instalar " + Planner.Name(p.Method) + " em:\r\n" + game.ExeDir +
-                         "\r\n\r\nArquivos existentes serão guardados como .dlss5bak e podem ser restaurados com \"Remover\".";
+            string msg = L.T("Instalar ") + Planner.Name(p.Method) + L.T(" em:\r\n") + game.ExeDir +
+                         L.T("\r\n\r\nArquivos existentes serão guardados como .dlss5bak e podem ser restaurados com \"Remover\".");
             if (!string.IsNullOrEmpty(game.AntiCheat))
-                msg += "\r\n\r\n⚠ ANTI-CHEAT DETECTADO (" + game.AntiCheat + "): use apenas offline. Em modo online isso pode resultar em banimento.";
+                msg += L.T("\r\n\r\n⚠ ANTI-CHEAT DETECTADO (") + game.AntiCheat + L.T("): use apenas offline. Em modo online isso pode resultar em banimento.");
             if (MessageBox.Show(this, msg, Program.AppName, MessageBoxButtons.OKCancel, string.IsNullOrEmpty(game.AntiCheat) ? MessageBoxIcon.Information : MessageBoxIcon.Warning) != DialogResult.OK)
                 return;
 
@@ -1289,11 +1471,11 @@ namespace Dlss5Injector
                 bar.Value = 100;
                 if (!Installer.IsStreamlineDir(slDir)) { slDir = FindStreamline(); UpdateSlRow(); }
                 lblStatus.ForeColor = Theme.Accent;
-                lblStatus.Text = "✔ DLSS 5 instalado em " + g.ExeName;
+                lblStatus.Text = L.T("✔ DLSS 5 instalado em ") + g.ExeName;
                 RefreshInstalledFlag(g.ExeDir);
-                MessageBox.Show(this, "DLSS 5 instalado!\r\n\r\n" + (p.Method == Method.RenoDX
-                    ? "Abra o jogo e ative o DLSS nas opções gráficas. A tecla Home abre o ReShade/RenoDX."
-                    : "Abra o jogo e aperte Insert para abrir o menu do OptiScaler → Neural Rendering (comece com 1 passe)."),
+                MessageBox.Show(this, L.T("DLSS 5 instalado!\r\n\r\n") + (p.Method == Method.RenoDX
+                    ? L.T("Abra o jogo e ative o DLSS nas opções gráficas. A tecla Home abre o ReShade/RenoDX.")
+                    : L.T("Abra o jogo e aperte Insert para abrir o menu do OptiScaler → Neural Rendering (comece com 1 passe).")),
                     Program.AppName, MessageBoxButtons.OK, MessageBoxIcon.Information);
                 AnalyzeExe(g.ExePath);
             });
@@ -1304,16 +1486,16 @@ namespace Dlss5Injector
             if (game == null) return;
             if (Manifest.Load(game.ExeDir) == null)
             {
-                MessageBox.Show(this, "Não há instalação do DLSS 5 Definitive nesta pasta.", Program.AppName);
+                MessageBox.Show(this, L.T("Não há instalação do DLSS 5 Definitive nesta pasta."), Program.AppName);
                 return;
             }
-            if (MessageBox.Show(this, "Remover tudo que o DLSS 5 Definitive instalou e restaurar os arquivos originais?", Program.AppName, MessageBoxButtons.YesNo) != DialogResult.Yes)
+            if (MessageBox.Show(this, L.T("Remover tudo que o DLSS 5 Definitive instalou e restaurar os arquivos originais?"), Program.AppName, MessageBoxButtons.YesNo) != DialogResult.Yes)
                 return;
             GameInfo g = game;
             RunBg("Removendo...", delegate { Installer.Uninstall(g.ExeDir, Log); }, delegate
             {
                 lblStatus.ForeColor = Theme.Accent;
-                lblStatus.Text = "✔ Arquivos originais restaurados.";
+                lblStatus.Text = L.T("✔ Arquivos originais restaurados.");
                 RefreshInstalledFlag(g.ExeDir);
                 AnalyzeExe(g.ExePath);
             });

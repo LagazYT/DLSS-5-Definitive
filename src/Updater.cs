@@ -114,7 +114,7 @@ namespace Dlss5Injector
                     u.Sha = Convert.ToString(o).Substring(7).ToUpperInvariant();
                 break;
             }
-            if (u.AssetUrl == null) throw new Exception("A versão " + u.Tag + " não tem o arquivo de " + (wantSetup ? "instalação" : "versão portable") + ".");
+            if (u.AssetUrl == null) throw new Exception(L.T("A versão ") + u.Tag + L.T(" não tem o arquivo de ") + (wantSetup ? L.T("instalação") : L.T("versão portable")) + ".");
             return u;
         }
 
@@ -155,7 +155,7 @@ namespace Dlss5Injector
             if (u.Sha != null && Util.Sha256(tmp) != u.Sha)
             {
                 File.Delete(tmp);
-                throw new Exception("O arquivo baixado não confere com o SHA-256 publicado no GitHub. A atualização foi cancelada.");
+                throw new Exception(L.T("O arquivo baixado não confere com o SHA-256 publicado no GitHub. A atualização foi cancelada."));
             }
             if (File.Exists(dest)) File.Delete(dest);
             File.Move(tmp, dest);
@@ -179,7 +179,7 @@ namespace Dlss5Injector
             if (Directory.Exists(ex)) Directory.Delete(ex, true);
             ZipFile.ExtractToDirectory(file, ex);
             string newExe = Directory.GetFiles(ex, "DLSS 5 Definitive.exe", SearchOption.AllDirectories).FirstOrDefault();
-            if (newExe == null) throw new Exception("O pacote da atualização não contém o DLSS 5 Definitive.exe.");
+            if (newExe == null) throw new Exception(L.T("O pacote da atualização não contém o DLSS 5 Definitive.exe."));
             string old = ExePath + ".old";
             if (File.Exists(old)) File.Delete(old);
             File.Move(ExePath, old);

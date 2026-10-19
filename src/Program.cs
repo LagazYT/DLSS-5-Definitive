@@ -15,6 +15,7 @@ namespace Dlss5Injector
         [STAThread]
         static void Main(string[] args)
         {
+            L.Init();   // idioma: configuração do usuário ou idioma do Windows
             ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072; // TLS 1.2 (GitHub/Steam)
             ServicePointManager.DefaultConnectionLimit = 16;
 
@@ -56,8 +57,8 @@ namespace Dlss5Injector
             if (!canContinue || Interlocked.Increment(ref showing) > 1) { if (canContinue) Interlocked.Decrement(ref showing); return; }
             try
             {
-                MessageBox.Show("Ocorreu um erro, mas o " + AppName + " continua aberto.\r\n\r\n" + (ex == null ? "" : ex.Message) +
-                    "\r\n\r\nDetalhes salvos em:\r\n" + CrashLog, AppName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(L.T("Ocorreu um erro, mas o ") + AppName + L.T(" continua aberto.") + "\r\n\r\n" + (ex == null ? "" : ex.Message) +
+                    "\r\n\r\n" + L.T("Detalhes salvos em:") + "\r\n" + CrashLog, AppName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
             catch { }
             finally { Interlocked.Decrement(ref showing); }

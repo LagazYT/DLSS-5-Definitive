@@ -161,7 +161,7 @@ namespace Dlss5Injector
 
     public static class Gpu
     {
-        public static string Name = "Desconhecida";
+        public static string Name = L.T("Desconhecida");
         public static int Series;      // 20, 30, 40, 50 para RTX; 0 = desconhecido
         public static bool IsNvidia;
 
@@ -199,8 +199,8 @@ namespace Dlss5Injector
         {
             get
             {
-                if (!IsNvidia) return "não-NVIDIA";
-                return Series > 0 ? "RTX " + Series : "NVIDIA (série não identificada)";
+                if (!IsNvidia) return L.T("não-NVIDIA");
+                return Series > 0 ? L.T("RTX ") + Series : L.T("NVIDIA (série não identificada)");
             }
         }
     }
@@ -230,23 +230,23 @@ namespace Dlss5Injector
             i.Hash = Util.Sha256(path);
             i.Version = Util.FileVer(path);
             string ver = i.Version.Major + "." + i.Version.Minor + "." + i.Version.Build;
-            if (i.Hash == HashCrossGen) { i.Kind = Kind.CrossGen; i.Label = "ShortFuse cross-gen 310.8 (FP16)"; }
-            else if (i.Hash == HashRtx50) { i.Kind = Kind.Official; i.Label = "NVIDIA oficial 310.8 · assinada"; }
+            if (i.Hash == HashCrossGen) { i.Kind = Kind.CrossGen; i.Label = L.T("ShortFuse cross-gen 310.8 (FP16)"); }
+            else if (i.Hash == HashRtx50) { i.Kind = Kind.Official; i.Label = L.T("NVIDIA oficial 310.8 · assinada"); }
             else if (Util.Describe(path).Contains("dlssnr") && Signature.IsNvidiaSigned(path))
             {
                 i.Kind = Kind.Official;
-                i.Label = "NVIDIA oficial " + ver + " · assinada";
+                i.Label = L.T("NVIDIA oficial ") + ver + L.T(" · assinada");
             }
-            else { i.Kind = Kind.Unknown; i.Label = "Versão " + ver + " não reconhecida (sem assinatura NVIDIA válida)"; }
+            else { i.Kind = Kind.Unknown; i.Label = L.T("Versão ") + ver + L.T(" não reconhecida (sem assinatura NVIDIA válida)"); }
 
             if (!Gpu.IsNvidia)
-                i.Warning = "GPU não-NVIDIA: o DLSS-NR não inicia sem NVIDIA (o fork tem um port 'vendor-neutral' opcional, não instalado por este app).";
+                i.Warning = L.T("GPU não-NVIDIA: o DLSS-NR não inicia sem NVIDIA (o fork tem um port 'vendor-neutral' opcional, não instalado por este app).");
             else if (i.Kind == Kind.Unknown)
-                i.Warning = "Arquivo não reconhecido: confira se é mesmo o nvngx_dlssnr.dll da NVIDIA.";
+                i.Warning = L.T("Arquivo não reconhecido: confira se é mesmo o nvngx_dlssnr.dll da NVIDIA.");
             else if (Gpu.Series >= 50 && i.Kind == Kind.CrossGen)
-                i.Warning = "A runtime cross-gen é para RTX 20/30/40; na sua RTX 50 use a oficial NVIDIA.";
+                i.Warning = L.T("A runtime cross-gen é para RTX 20/30/40; na sua RTX 50 use a oficial NVIDIA.");
             else if (Gpu.Series >= 20 && Gpu.Series <= 40 && i.Kind == Kind.Official)
-                i.Warning = "Na RTX " + Gpu.Series + " o fork documenta só a cross-gen 310.8 do ShortFuse (SHA-256 E67DEE20...); a oficial pode não iniciar.";
+                i.Warning = L.T("Na RTX ") + Gpu.Series + L.T(" o fork documenta só a cross-gen 310.8 do ShortFuse (SHA-256 E67DEE20...); a oficial pode não iniciar.");
             return i;
         }
 

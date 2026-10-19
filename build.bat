@@ -16,7 +16,7 @@ echo OK: DLSS 5 Definitive.exe
 if not exist dist mkdir dist
 "%CSC%" /nologo /target:winexe /platform:anycpu /optimize+ /codepage:65001 /out:"dist\DLSS 5 Definitive Setup.exe" /win32manifest:setup\setup.manifest /win32icon:app.ico %REFS% ^
   "/resource:DLSS 5 Definitive.exe,app.exe" "/resource:LEIA-ME.txt,readme.txt" ^
-  setup\Setup.cs src\Common.cs src\Ui.cs src\Library.cs src\Installer.cs src\Downloader.cs src\Planner.cs src\GameScanner.cs
+  setup\Setup.cs src\Lang.cs src\Common.cs src\Ui.cs src\Library.cs src\Installer.cs src\Downloader.cs src\Planner.cs src\GameScanner.cs
 if errorlevel 1 (echo FALHOU: instalador & exit /b 1)
 echo OK: dist\DLSS 5 Definitive Setup.exe
 

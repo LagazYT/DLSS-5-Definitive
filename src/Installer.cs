@@ -116,7 +116,7 @@ namespace Dlss5Injector
                 File.SetAttributes(abs, FileAttributes.Normal);
                 File.Move(abs, bak);
                 man.Add("BAK", man.Rel(abs), man.Rel(bak));
-                log("    backup: " + man.Rel(abs) + " → " + Path.GetFileName(bak));
+                log(L.T("    backup: ") + man.Rel(abs) + " → " + Path.GetFileName(bak));
             }
             else if (File.Exists(abs)) File.SetAttributes(abs, FileAttributes.Normal);
             if (src != null) File.Copy(src, abs, true);
@@ -136,12 +136,12 @@ namespace Dlss5Injector
             File.SetAttributes(abs, FileAttributes.Normal);
             File.Move(abs, bak);
             man.Add("BAK", man.Rel(abs), man.Rel(bak));
-            log("    desativado: " + man.Rel(abs) + " → " + Path.GetFileName(bak));
+            log(L.T("    desativado: ") + man.Rel(abs) + " → " + Path.GetFileName(bak));
         }
 
         void PutText(List<string> lines, string target)
         {
-            Put(null, new UTF8Encoding(false).GetBytes(string.Join("\r\n", lines.ToArray()) + "\r\n"), target);
+            Put(null, new UTF8Encoding(false).GetBytes(string.Join(L.T("\r\n"), lines.ToArray()) + L.T("\r\n")), target);
         }
 
         void PutTree(string srcDir, string targetRel)
@@ -158,8 +158,8 @@ namespace Dlss5Injector
         string VerifiedSl(string slDir, string name)
         {
             string f = Path.Combine(SlBin(slDir), name);
-            if (!File.Exists(f)) throw new Exception("Arquivo não encontrado na pasta Streamline: " + f);
-            if (!Signature.IsNvidiaSigned(f)) throw new Exception("Assinatura NVIDIA inválida em " + f + " — instalação cancelada.");
+            if (!File.Exists(f)) throw new Exception(L.T("Arquivo não encontrado na pasta Streamline: ") + f);
+            if (!Signature.IsNvidiaSigned(f)) throw new Exception(L.T("Assinatura NVIDIA inválida em ") + f + L.T(" — instalação cancelada."));
             return f;
         }
 
@@ -167,20 +167,20 @@ namespace Dlss5Injector
 
         public void Install(GameInfo g, InstallPlan p, string slDir, string nrPath)
         {
-            if (p.Method == Method.None) throw new Exception("Nenhum método compatível selecionado.");
+            if (p.Method == Method.None) throw new Exception(L.T("Nenhum método compatível selecionado."));
             if (string.IsNullOrEmpty(nrPath) || !File.Exists(nrPath))
-                throw new Exception("Selecione o arquivo nvngx_dlssnr.dll (runtime do DLSS 5 / Neural Rendering).");
+                throw new Exception(L.T("Selecione o arquivo nvngx_dlssnr.dll (runtime do DLSS 5 / Neural Rendering)."));
             bool needSl = p.PlaceDlss || p.UpdateGameDlss || p.CopyStreamlineFG;
             if (needSl && !IsStreamlineDir(slDir))
             {
-                log("Pasta do Streamline SDK não encontrada neste PC — baixando a versão oficial da NVIDIA.");
+                log(L.T("Pasta do Streamline SDK não encontrada neste PC — baixando a versão oficial da NVIDIA."));
                 slDir = dl.EnsureStreamline();
             }
 
             log("== Instalando: " + Planner.Name(p.Method) + " em " + g.ExeDir);
 
             // 1) Baixa tudo antes de mexer no jogo
-            log("1/4 Obtendo componentes");
+            log(L.T("1/4 Obtendo componentes"));
             string opti = null, reshade = null, renodx = null, dxvk = null, dgv = null, sm86 = null;
             if (p.Sm86) sm86 = dl.EnsureSm86();
             if (p.Method == Method.RenoDX)
@@ -193,7 +193,7 @@ namespace Dlss5Injector
             if (p.DgVoodoo) dgv = dl.EnsureDgVoodoo();
 
             // 2) Valida DLLs NVIDIA da pasta Streamline
-            log("2/4 Verificando assinaturas NVIDIA da pasta Streamline");
+            log(L.T("2/4 Verificando assinaturas NVIDIA da pasta Streamline"));
             Dictionary<string, string> sl = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             if (needSl)
             {
@@ -207,17 +207,17 @@ namespace Dlss5Injector
             // 3) Remove instalação anterior deste app
             if (Manifest.Load(g.ExeDir) != null)
             {
-                log("3/4 Removendo instalação anterior do DLSS 5 Definitive");
+                log(L.T("3/4 Removendo instalação anterior do DLSS 5 Definitive"));
                 Uninstall(g.ExeDir, log);
             }
-            else log("3/4 Nenhuma instalação anterior");
+            else log(L.T("3/4 Nenhuma instalação anterior"));
 
             man = new Manifest();
             man.Dir = g.ExeDir;
             man.Method = p.Method.ToString();
             man.Save();
 
-            log("4/4 Copiando arquivos");
+            log(L.T("4/4 Copiando arquivos"));
             try
             {
                 foreach (string rt in new[] { "OptiScaler.log", "ReShade.log", "ReShade.ini", Path.GetFileNameWithoutExtension(g.ExeName) + "_d3d11.log",
@@ -260,7 +260,7 @@ namespace Dlss5Injector
                     IniEdit.Set(ini, "FrameGeneration", "MaxGeneratedFrames", p.Sm86MaxFrames.ToString());
                     IniEdit.Set(ini, "SuperResolution", "Mode", "Off");
                     PutText(ini, "dlssg_sm86.ini");
-                    log("    dlssg_for_sm86 " + Path.GetFileName(sm86) + " como " + p.Sm86Proxy + " (até " + (p.Sm86MaxFrames + 1) + "X, runtime DLSS-G " +
+                    log(L.T("    dlssg_for_sm86 ") + Path.GetFileName(sm86) + L.T(" como ") + p.Sm86Proxy + L.T(" (até ") + (p.Sm86MaxFrames + 1) + L.T("X, runtime DLSS-G ") +
                         Util.FileVerStr(Path.Combine(sm86, "dlssg_sm86", "runtime", "nvngx_dlssg.dll")) + " assinado pela NVIDIA)");
                 }
 
@@ -282,7 +282,7 @@ namespace Dlss5Injector
                             PutFile(src, f);
                             log("    " + n + " " + have + " → " + nv + " (" + man.Rel(f) + ")");
                         }
-                        else log("    " + n + " já está em " + have + " (mantido)");
+                        else log("    " + n + L.T(" já está em ") + have + L.T(" (mantido)"));
                     }
                 }
 
@@ -301,11 +301,11 @@ namespace Dlss5Injector
             }
             catch
             {
-                log("!! Erro durante a cópia — desfazendo alterações...");
+                log(L.T("!! Erro durante a cópia — desfazendo alterações..."));
                 try { Uninstall(g.ExeDir, log); } catch { }
                 throw;
             }
-            log("== Concluído. " + man.E.Count(e => e[0] == "ADD") + " arquivo(s) instalados, " + man.E.Count(e => e[0] == "BAK") + " backup(s).");
+            log(L.T("== Concluído. ") + man.E.Count(e => e[0] == "ADD") + L.T(" arquivo(s) instalados, ") + man.E.Count(e => e[0] == "BAK") + L.T(" backup(s)."));
         }
 
         void InstallOpti(GameInfo g, InstallPlan p, string opti)
@@ -347,7 +347,7 @@ namespace Dlss5Injector
             Manifest m = Manifest.Load(exeDir);
             if (m == null)
             {
-                log("Nada para remover (sem " + Manifest.FileName + ").");
+                log(L.T("Nada para remover (sem ") + Manifest.FileName + ").");
                 return;
             }
             int removed = 0, restored = 0;
@@ -387,7 +387,7 @@ namespace Dlss5Injector
                 catch (Exception ex) { log("  ! " + string.Join("|", e) + ": " + ex.Message); }
             }
             File.Delete(Path.Combine(exeDir, Manifest.FileName));
-            log("Removido: " + removed + " arquivo(s) apagados, " + restored + " backup(s) restaurados.");
+            log(L.T("Removido: ") + removed + L.T(" arquivo(s) apagados, ") + restored + L.T(" backup(s) restaurados."));
         }
     }
 }

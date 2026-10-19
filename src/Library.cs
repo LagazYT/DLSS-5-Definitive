@@ -141,18 +141,18 @@ namespace Dlss5Injector
         public void ScanAll()
         {
             Step("Steam", ScanSteam);
-            Step("Epic Games", ScanEpic);
+            Step(L.T("Epic Games"), ScanEpic);
             Step("GOG", ScanGog);
-            Step("Ubisoft Connect", ScanUbisoft);
-            Step("EA app", ScanEa);
-            Step("discos", ScanDrives);
+            Step(L.T("Ubisoft Connect"), ScanUbisoft);
+            Step(L.T("EA app"), ScanEa);
+            Step(L.T("discos"), ScanDrives);
             foreach (string f in LibraryStore.CustomFolders()) ScanFolder(f);
         }
 
         void Step(string what, Action a)
         {
             if (Cancel) return;
-            status("Escaneando " + what + "...");
+            status(L.T("Escaneando ") + what + "...");
             try { a(); } catch { }
         }
 
@@ -300,7 +300,7 @@ namespace Dlss5Injector
             {
                 if (Cancel) return;
                 string drive = d.RootDirectory.FullName;
-                status("Escaneando disco " + drive + "...");
+                status(L.T("Escaneando disco ") + drive + "...");
                 List<string> dirs = new List<string>();
                 foreach (string r in roots) dirs.Add(System.IO.Path.Combine(drive, r));
                 // Pastas da raiz com nome de jogos (ex.: D:\Meus Jogos, E:\Games2)
@@ -326,7 +326,7 @@ namespace Dlss5Injector
         public void ScanFolder(string folder)
         {
             if (!Directory.Exists(folder)) return;
-            status("Escaneando " + folder + "...");
+            status(L.T("Escaneando ") + folder + "...");
             string common = System.IO.Path.Combine(folder, "steamapps", "common");
             if (Directory.Exists(common)) { ScanFolderChildren(common, "Pasta", 0); return; }
             // A própria pasta é um jogo?

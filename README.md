@@ -27,6 +27,14 @@ O app verifica as [Releases](../../releases) deste repositório ao abrir e a cad
 
 Para atualizar por script: `"DLSS 5 Definitive.exe" /update-now`.
 
+## Idiomas e configurações
+
+O app está em **português, inglês e espanhol** e escolhe sozinho o idioma do Windows. Na aba **Configurações** (ícone de engrenagem) dá para trocar o idioma e também:
+
+- ligar/desligar a verificação automática de atualizações;
+- ver e alterar as pastas do Streamline e do runtime DLSS 5;
+- abrir a pasta de dados ou limpar os downloads em cache.
+
 ## O que ele faz
 
 ### Biblioteca
