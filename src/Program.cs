@@ -10,7 +10,7 @@ namespace Dlss5Injector
     {
         public const string AppName = "DLSS 5 Definitive";
         public const string Author = "Lagaz";
-        public const string Version = "2.1";
+        public const string Version = "2.1.1";
 
         [STAThread]
         static void Main(string[] args)
