@@ -1,0 +1,15 @@
+# Saídas de compilação (publicadas na página de Releases)
+*.exe
+*.zip
+dist/
+
+# Dados do modo portable
+Data/
+portable.ini
+
+# Arquivos da NVIDIA que nunca devem ir para o repositório
+*.dll
+
+# Windows
+Thumbs.db
+desktop.ini

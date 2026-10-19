@@ -1,0 +1,52 @@
+using System;
+using System.IO;
+using System.Net;
+using System.Threading;
+using System.Windows.Forms;
+
+namespace Dlss5Injector
+{
+    static class Program
+    {
+        public const string AppName = "DLSS 5 Definitive";
+        public const string Author = "Lagaz";
+        public const string Version = "2.0";
+
+        [STAThread]
+        static void Main(string[] args)
+        {
+            ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072; // TLS 1.2 (GitHub/Steam)
+            ServicePointManager.DefaultConnectionLimit = 16;
+
+            // Erros da interface viram aviso e vão para o crash.log, sem fechar o app.
+            Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+            Application.ThreadException += delegate(object s, ThreadExceptionEventArgs e) { Report(e.Exception, true); };
+            AppDomain.CurrentDomain.UnhandledException += delegate(object s, UnhandledExceptionEventArgs e) { Report(e.ExceptionObject as Exception, false); };
+
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            Application.Run(new MainForm(args.Length > 0 ? args[0] : null));
+        }
+
+        public static string CrashLog { get { return Path.Combine(AppPaths.Root, "crash.log"); } }
+
+        static int showing;
+
+        public static void Report(Exception ex, bool canContinue)
+        {
+            try
+            {
+                File.AppendAllText(CrashLog, "==== " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " (v" + Version + ")\r\n" + ex + "\r\n\r\n");
+            }
+            catch { }
+            if (!canContinue || Interlocked.Increment(ref showing) > 1) { if (canContinue) Interlocked.Decrement(ref showing); return; }
+            try
+            {
+                MessageBox.Show("Ocorreu um erro, mas o " + AppName + " continua aberto.\r\n\r\n" + (ex == null ? "" : ex.Message) +
+                    "\r\n\r\nDetalhes salvos em:\r\n" + CrashLog, AppName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            catch { }
+            finally { Interlocked.Decrement(ref showing); }
+        }
+    }
+}

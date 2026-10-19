@@ -1,0 +1,48 @@
+﻿DLSS 5 Definitive  -  criado por Lagaz
+=====================================
+
+Instalador e portable
+  DLSS 5 Definitive Setup.exe .... instala em %LOCALAPPDATA%\Programs\DLSS 5 Definitive (sem administrador),
+                                   cria atalhos e aparece em Configurações > Aplicativos (com desinstalador).
+  DLSS 5 Definitive Portable.zip . extraia em qualquer pasta ou pendrive; tudo fica na pasta Data ao lado do exe.
+  Requisitos: Windows 10/11 64-bit (o .NET Framework 4.8 já vem no Windows). Internet na 1ª instalação de um jogo
+  (o app baixa OptiScaler, Streamline oficial da NVIDIA etc. e confere os hashes).
+  O nvngx_dlssnr.dll (runtime do DLSS 5) não vai junto: em outro PC, coloque-o em Downloads ou escolha em Alterar.
+
+Abas
+  Biblioteca     Encontra sozinho os jogos do PC (Steam, Epic, GOG, Ubisoft, EA, Xbox e pastas
+                 "Games"/"Jogos" de todos os discos) com a capa de cada jogo. "Adicionar pasta"
+                 escaneia uma pasta sua. Clique num jogo para configurar o DLSS 5.
+                 Botão direito no card: abrir pasta, buscar capa de novo, remover da biblioteca.
+  Injetor DLSS 5 Analisa o jogo (API, engine, upscaler, anti-cheat) e instala o DLSS 5
+                 (Neural Rendering) pelo melhor método: OptiScaler F5 ou RenoDX.
+  Frame Gen      Multi Frame Generation por IA da NVIDIA, de 1X (desligado) até 6X, ou dinâmico.
+
+Runtime do DLSS 5
+  O app usa o nvngx_dlssnr.dll que encontrar em Downloads (prefere a versão mais nova e confere
+  a assinatura da NVIDIA). Ele não vem no OptiScaler, no RenoDX nem no Streamline SDK.
+
+Multi Frame Generation por IA (aba Frame Gen) - modelo DLSS-G da NVIDIA, também em jogos sem suporte
+  RTX 50 ............ DLSS 4 Multi Frame Generation nativo, 2X a 6X, ou dinâmico
+  RTX 40 ............ 2X nativo; 3X-4X pelo desbloqueio de MFG embutido no OptiScaler F5 (experimental)
+  RTX 30 / 20 ....... até 4X com dlssg_for_sm86 (sdli1995, GPLv3), baixado do GitHub na instalação;
+                      usa o nvngx_dlssg 310.9.16 oficial da NVIDIA (assinatura conferida). DX12. Experimental.
+  Outras GPUs ....... Intel XeSS Frame Generation (DX12) / AMD FSR FG (Vulkan)
+  Jogos sem FG próprio: o OptiScaler gera profundidade e movimento (Optical F5Low) para o modelo.
+  Jogos com FG próprio: o multiplicador é forçado no FG do jogo (ative-o no menu do jogo).
+
+Método automático do Injetor
+  DX12 ........................ OptiScaler F5 (alternativa: RenoDX, se o jogo tiver DLSS)
+  DX11 com DLSS ............... RenoDX DLSS 5 (ReShade). Alternativa: OptiScaler dlss_12
+  DX11 com FSR/XeSS ........... OptiScaler F5 (Dx11Upscaler=dlss_12)
+  DX11 sem upscaler ........... DXVK + OptiScaler F5 (Optical F5Low)
+  Vulkan ...................... OptiScaler F5
+  DX10 ........................ DXVK + OptiScaler F5 (experimental)
+  DX9 ......................... dgVoodoo2 (DX9->DX12) + OptiScaler F5 (experimental)
+  32-bit / OpenGL ............. não suportado
+
+Remover: "Remover" no Injetor desfaz tudo e restaura os arquivos originais (.dlss5bak).
+Erros: se algo der errado o app continua aberto e salva os detalhes em
+  %LOCALAPPDATA%\DLSS5Definitive\crash.log
+Aviso: não use em jogos online com anti-cheat (EAC, BattlEye...): risco de banimento.
+Recompilar: build.bat (usa o compilador C# que já vem no Windows).
