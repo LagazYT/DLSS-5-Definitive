@@ -16,7 +16,7 @@ namespace Dlss5Setup
     static class SetupApp
     {
         public const string AppName = "DLSS 5 Definitive";
-        public const string Version = "2.1.1";
+        public const string Version = "2.2";
         public const string Author = "Lagaz";
         public const string ExeName = "DLSS 5 Definitive.exe";
         public const string UninstName = "Desinstalar.exe";
