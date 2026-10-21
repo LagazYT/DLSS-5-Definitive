@@ -474,6 +474,17 @@ namespace Dlss5Injector
             A("Pronto.", "Ready.", "Listo.");
             A("desligado", "off", "desactivado");
             A("discos", "drives", "discos");
+            A("Runtime do DLSS 5 encontrada: ", "DLSS 5 runtime found: ", "Runtime de DLSS 5 encontrado: ");
+            A("Clique em Instalar DLSS 5 de novo.", "Click Install DLSS 5 again.", "Haga clic en Instalar DLSS 5 de nuevo.");
+            A("Este arquivo não é a runtime do DLSS 5.", "This file is not the DLSS 5 runtime.", "Este archivo no es el runtime de DLSS 5.");
+            A("O nvngx.dll_dlssnr.dll é o \"forwarder\" que já vem dentro do OptiScaler F5 — o app instala ele sozinho. ",
+              "nvngx.dll_dlssnr.dll is the \"forwarder\" that already comes inside OptiScaler F5 — the app installs it by itself. ",
+              "nvngx.dll_dlssnr.dll es el \"forwarder\" que ya viene dentro de OptiScaler F5 — la app lo instala sola. ");
+            A("A runtime é o nvngx_dlssnr.dll da NVIDIA (cerca de 250 MB).", "The runtime is NVIDIA's nvngx_dlssnr.dll (about 250 MB).",
+              "El runtime es el nvngx_dlssnr.dll de NVIDIA (unos 250 MB).");
+            A("Não encontrado — coloque o nvngx_dlssnr.dll em Downloads, arraste para cá ou clique em Alterar",
+              "Not found — put nvngx_dlssnr.dll in Downloads, drag it here or click Change",
+              "No encontrado — ponga el nvngx_dlssnr.dll en Descargas, arrástrelo aquí o haga clic en Cambiar");
         }
     }
 }

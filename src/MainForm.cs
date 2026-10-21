@@ -152,6 +152,52 @@ namespace Dlss5Injector
                 updTimer.Start();
             };
             FormClosing += delegate { if (scanner != null) scanner.Cancel = true; LibraryStore.Save(games); };
+
+            // Se a runtime do DLSS 5 ou o Streamline aparecerem depois que o app abriu (copiados/extraídos em
+            // Downloads, por exemplo), detecta sozinho — sem precisar reabrir o app.
+            System.Windows.Forms.Timer redetect = new System.Windows.Forms.Timer();
+            redetect.Interval = 3000;
+            redetect.Tick += delegate { RedetectFiles(); };
+            redetect.Start();
+            Activated += delegate { RedetectFiles(); };
+        }
+
+        /// <summary>Procura de novo a runtime do DLSS 5 e o Streamline quando eles estão faltando.</summary>
+        void RedetectFiles()
+        {
+            if (busy) return;
+            if (string.IsNullOrEmpty(nrPath) || !File.Exists(nrPath))
+            {
+                string found = NrRuntime.FindCandidate(slDir);
+                if (found != null)
+                {
+                    Log(L.T("Runtime do DLSS 5 encontrada: ") + found);
+                    SetNr(found, false);
+                }
+            }
+            if (!Installer.IsStreamlineDir(slDir))
+            {
+                string sl = FindStreamline();
+                if (sl != null) { slDir = sl; UpdateSlRow(); RefreshPlan(); }
+            }
+        }
+
+        /// <summary>
+        /// Recusa o forwarder do OptiScaler (nvngx.dll_dlssnr.dll), que tem nome parecido mas não é a runtime.
+        /// </summary>
+        bool AcceptNrFile(string file)
+        {
+            string n = Path.GetFileName(file);
+            if (n.Equals("nvngx.dll_dlssnr.dll", StringComparison.OrdinalIgnoreCase) ||
+                (!n.Equals(NrRuntime.FileName, StringComparison.OrdinalIgnoreCase) && new FileInfo(file).Length < (20L << 20)))
+            {
+                MessageBox.Show(this, L.T("Este arquivo não é a runtime do DLSS 5.") + "\r\n\r\n" +
+                    L.T("O nvngx.dll_dlssnr.dll é o \"forwarder\" que já vem dentro do OptiScaler F5 — o app instala ele sozinho. ") +
+                    L.T("A runtime é o nvngx_dlssnr.dll da NVIDIA (cerca de 250 MB)."),
+                    Program.AppName, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return false;
+            }
+            return true;
         }
 
         // ================================================================ ATUALIZAÇÃO
@@ -1197,7 +1243,7 @@ namespace Dlss5Injector
             {
                 d.Filter = "nvngx_dlssnr.dll|nvngx_dlssnr.dll|DLL|*.dll";
                 d.Title = L.T("Selecione a runtime do DLSS 5 (nvngx_dlssnr.dll)");
-                if (d.ShowDialog(this) == DialogResult.OK) SetNr(d.FileName, true);
+                if (d.ShowDialog(this) == DialogResult.OK && AcceptNrFile(d.FileName)) SetNr(d.FileName, true);
             }
         }
 
@@ -1207,7 +1253,7 @@ namespace Dlss5Injector
             nrPath = path;
             if (string.IsNullOrEmpty(path) || !File.Exists(path))
             {
-                SetNrRow(Theme.GError, Theme.Danger, L.T("Não encontrado — clique em Alterar e selecione o arquivo"));
+                SetNrRow(Theme.GError, Theme.Danger, L.T("Não encontrado — coloque o nvngx_dlssnr.dll em Downloads, arraste para cá ou clique em Alterar"));
                 RefreshPlan();
                 return;
             }
@@ -1250,6 +1296,12 @@ namespace Dlss5Injector
             drop.Invalidate();
             string[] f = (string[])e.Data.GetData(DataFormats.FileDrop);
             if (f == null || f.Length == 0) return;
+            if (File.Exists(f[0]) && f[0].EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+            {
+                // Arrastar a runtime (nvngx_dlssnr.dll) para a janela
+                if (AcceptNrFile(f[0])) { SetNr(f[0], true); Log(L.T("Runtime do DLSS 5 encontrada: ") + f[0]); }
+                return;
+            }
             tabs.Selected = 1;
             if (File.Exists(f[0]) && f[0].EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) SetFolder(Path.GetDirectoryName(f[0]), f[0]);
             else if (Directory.Exists(f[0])) SetFolder(f[0], null);
@@ -1432,6 +1484,15 @@ namespace Dlss5Injector
             if (p == null || game == null) return;
             if (string.IsNullOrEmpty(nrPath) || !File.Exists(nrPath))
             {
+                // Procura de novo antes de reclamar (o arquivo pode ter sido colocado depois que o app abriu)
+                string again = NrRuntime.FindCandidate(slDir);
+                if (again != null)
+                {
+                    SetNr(again, false);
+                    MessageBox.Show(this, L.T("Runtime do DLSS 5 encontrada: ") + again + "\r\n\r\n" + L.T("Clique em Instalar DLSS 5 de novo."),
+                        Program.AppName, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
                 tabs.Selected = 1;
                 MessageBox.Show(this, L.T("Falta a runtime do DLSS 5: nvngx_dlssnr.dll.\r\n\r\nEla não vem no OptiScaler, no RenoDX nem no Streamline SDK. ") +
                     L.T("Use o botão Alterar ao lado de \"Runtime DLSS 5\"."), Program.AppName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
