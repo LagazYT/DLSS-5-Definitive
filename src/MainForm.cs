@@ -129,6 +129,7 @@ namespace Dlss5Injector
             if (string.IsNullOrEmpty(nr) || !File.Exists(nr) ||
                 (found != null && Settings.Get("nrManual") != "1" && Util.FileVer(found) > Util.FileVer(nr))) nr = found;
             SetNr(nr, false);
+            if (string.IsNullOrEmpty(nr) || !File.Exists(nr)) AutoObtainNr();
 
             DragEnter += OnDragEnter;
             DragDrop += OnDragDrop;
@@ -1310,7 +1311,45 @@ namespace Dlss5Injector
             }
         }
 
-        bool importingNr;
+        bool importingNr, obtainingNr;
+
+        static string NrMissingText()
+        {
+            return L.T("Falta a runtime do DLSS 5 (nvngx_dlssnr.dll). A NVIDIA ainda não publica esse arquivo para download: ele vem dentro de jogos com DLSS 5 (ex.: NBA 2K27), e o app procura nos seus jogos instalados automaticamente. ") +
+                   L.T("Você também pode colocá-lo em Downloads, arrastá-lo para a janela ou usar Alterar.");
+        }
+
+        /// <summary>
+        /// Runtime ausente em todo lugar conhecido: tenta o GitHub oficial da NVIDIA e os jogos instalados, em segundo plano.
+        /// </summary>
+        void AutoObtainNr()
+        {
+            if (obtainingNr || importingNr || (!string.IsNullOrEmpty(nrPath) && File.Exists(nrPath))) return;
+            obtainingNr = true;
+            SetNrRow(Theme.GSync, Theme.Info, L.T("Procurando a runtime do DLSS 5 nos jogos instalados... "));
+            Thread t = new Thread(delegate()
+            {
+                string got = null;
+                try
+                {
+                    got = RuntimeProvider.Obtain(AppPaths.Components, delegate(string s) { SafeInvoke(delegate { SetNrRow(Theme.GSync, Theme.Info, s); }); });
+                }
+                catch { }
+                SafeInvoke(delegate
+                {
+                    obtainingNr = false;
+                    if (got != null)
+                    {
+                        Log(L.T("Runtime do DLSS 5 copiada para a pasta do app: ") + got);
+                        UseNr(got, false);
+                    }
+                    else if (string.IsNullOrEmpty(nrPath) || !File.Exists(nrPath))
+                        SetNrRow(Theme.GError, Theme.Danger, L.T("Não encontrada no PC nem nos jogos — coloque o nvngx_dlssnr.dll em Downloads, arraste para cá ou clique em Alterar"));
+                });
+            });
+            t.IsBackground = true;
+            t.Start();
+        }
 
         void SetNr(string path, bool manual)
         {
@@ -1580,7 +1619,7 @@ namespace Dlss5Injector
             if (cmbMethod.SelectedIndex == 0 && !string.IsNullOrEmpty(methodWhy)) header += L.T("\r\n") + methodWhy;
             List<string> warns = new List<string>(p.Warnings);
             if (nrInfo != null && nrInfo.Warning != null) warns.Add(nrInfo.Warning);
-            if (string.IsNullOrEmpty(nrPath) || !File.Exists(nrPath)) warns.Add(L.T("Falta a runtime do DLSS 5 (nvngx_dlssnr.dll): use Alterar na seção 3."));
+            if (string.IsNullOrEmpty(nrPath) || !File.Exists(nrPath)) warns.Add(NrMissingText());
             steps.SetContent(header, p.Steps, warns, null);
         }
 
@@ -1599,9 +1638,26 @@ namespace Dlss5Injector
                         Program.AppName, MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
                 }
-                tabs.Selected = 1;
-                MessageBox.Show(this, L.T("Falta a runtime do DLSS 5: nvngx_dlssnr.dll.\r\n\r\nEla não vem no OptiScaler, no RenoDX nem no Streamline SDK. ") +
-                    L.T("Use o botão Alterar ao lado de \"Runtime DLSS 5\"."), Program.AppName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                // Busca completa: GitHub oficial da NVIDIA (se publicado) e jogos instalados no PC. Se achar, segue a instalação.
+                if (obtainingNr) return;
+                obtainingNr = true;
+                string obtained = null;
+                RunBg(L.T("Procurando a runtime do DLSS 5 nos jogos instalados... "), delegate
+                {
+                    try { obtained = RuntimeProvider.Obtain(AppPaths.Components, Log); } catch (Exception ex) { Log(ex.Message); }
+                }, delegate
+                {
+                    obtainingNr = false;
+                    if (obtained != null)
+                    {
+                        Log(L.T("Runtime do DLSS 5 copiada para a pasta do app: ") + obtained);
+                        UseNr(obtained, false);
+                        DoInstall();
+                        return;
+                    }
+                    tabs.Selected = 1;
+                    MessageBox.Show(this, NrMissingText(), Program.AppName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                });
                 return;
             }
             if (!Util.CanWrite(game.ExeDir))

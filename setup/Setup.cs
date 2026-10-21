@@ -17,7 +17,7 @@ namespace Dlss5Setup
     static class SetupApp
     {
         public const string AppName = "DLSS 5 Definitive";
-        public const string Version = "2.2.1";
+        public const string Version = "2.2.2";
         public const string Author = "Lagaz";
         public const string ExeName = "DLSS 5 Definitive.exe";
         public const string UninstName = "Desinstalar.exe";
@@ -403,12 +403,50 @@ namespace Dlss5Setup
             slSrc = SetupApp.FindSlSource(dir);
             if (nrSrc != null)
                 rowNr.Set(Theme.GCheck, Theme.Accent, L.T("Encontrada — será copiada para a pasta do app: ") + nrSrc);
+            else if (!searchedGames)
+                SearchGames();
             else
                 rowNr.Set(Theme.GWarn, Theme.Warn, L.T("Não encontrada — escolha agora (opcional) ou depois no app"));
             if (slSrc != null)
                 rowSl.Set(Theme.GCheck, Theme.Accent, L.T("Encontrado — será copiado para a pasta do app: ") + slSrc);
             else
                 rowSl.Set(Theme.GDownload, Theme.Info, L.T("Será baixado da NVIDIA quando você instalar o DLSS 5 num jogo"));
+        }
+
+        bool searchedGames;
+
+        /// <summary>Procura a runtime no GitHub oficial da NVIDIA (se publicada) e nos jogos instalados, sem travar a janela.</summary>
+        void SearchGames()
+        {
+            searchedGames = true;
+            rowNr.Set(Theme.GSync, Theme.Info, L.T("Procurando a runtime do DLSS 5 nos jogos instalados... "));
+            if (!IsHandleCreated)
+            {
+                // Começa só quando a janela existir, senão o resultado chegaria antes dela e se perderia
+                Shown += delegate { searchedGames = false; SearchGames(); };
+                return;
+            }
+            Thread t = new Thread(delegate()
+            {
+                string got = null;
+                try
+                {
+                    got = RuntimeProvider.Obtain(Path.Combine(Path.GetTempPath(), "DLSS5Definitive-runtime"),
+                        delegate(string s) { try { BeginInvoke(new Action(delegate { if (nrSrc == null) rowNr.Set(Theme.GSync, Theme.Info, s); })); } catch { } });
+                }
+                catch { }
+                try
+                {
+                    BeginInvoke(new Action(delegate
+                    {
+                        if (nrSrc == null && got != null) nrSrc = got;
+                        DetectSources();
+                    }));
+                }
+                catch { }
+            });
+            t.IsBackground = true;
+            t.Start();
         }
 
         void ChooseNr()

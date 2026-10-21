@@ -474,6 +474,20 @@ namespace Dlss5Injector
             A("Pronto.", "Ready.", "Listo.");
             A("desligado", "off", "desactivado");
             A("discos", "drives", "discos");
+            A("Procurando a runtime do DLSS 5 nos jogos instalados... ", "Looking for the DLSS 5 runtime in installed games... ",
+              "Buscando el runtime de DLSS 5 en los juegos instalados... ");
+            A("Baixando a runtime do DLSS 5 do GitHub oficial da NVIDIA...", "Downloading the DLSS 5 runtime from NVIDIA's official GitHub...",
+              "Descargando el runtime de DLSS 5 del GitHub oficial de NVIDIA...");
+            A("Runtime do DLSS 5 encontrada no jogo: ", "DLSS 5 runtime found in game: ", "Runtime de DLSS 5 encontrado en el juego: ");
+            A("Não encontrada no PC nem nos jogos — coloque o nvngx_dlssnr.dll em Downloads, arraste para cá ou clique em Alterar",
+              "Not found on the PC or in your games — put nvngx_dlssnr.dll in Downloads, drag it here or click Change",
+              "No encontrado en el PC ni en los juegos — ponga el nvngx_dlssnr.dll en Descargas, arrástrelo aquí o haga clic en Cambiar");
+            A("Falta a runtime do DLSS 5 (nvngx_dlssnr.dll). A NVIDIA ainda não publica esse arquivo para download: ele vem dentro de jogos com DLSS 5 (ex.: NBA 2K27), e o app procura nos seus jogos instalados automaticamente. ",
+              "The DLSS 5 runtime (nvngx_dlssnr.dll) is missing. NVIDIA does not publish this file for download yet: it ships inside games with DLSS 5 (e.g. NBA 2K27), and the app looks for it in your installed games automatically. ",
+              "Falta el runtime de DLSS 5 (nvngx_dlssnr.dll). NVIDIA todavía no publica este archivo para descargar: viene dentro de juegos con DLSS 5 (p. ej., NBA 2K27), y la app lo busca automáticamente en sus juegos instalados. ");
+            A("Você também pode colocá-lo em Downloads, arrastá-lo para a janela ou usar Alterar.",
+              "You can also put it in Downloads, drag it onto the window or use Change.",
+              "También puede ponerlo en Descargas, arrastrarlo a la ventana o usar Cambiar.");
             A("Runtime do DLSS 5 encontrada: ", "DLSS 5 runtime found: ", "Runtime de DLSS 5 encontrado: ");
             A("Clique em Instalar DLSS 5 de novo.", "Click Install DLSS 5 again.", "Haga clic en Instalar DLSS 5 de nuevo.");
             A("Este arquivo não é a runtime do DLSS 5.", "This file is not the DLSS 5 runtime.", "Este archivo no es el runtime de DLSS 5.");
