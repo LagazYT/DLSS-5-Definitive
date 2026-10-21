@@ -5,6 +5,7 @@ dist/
 
 # Dados do modo portable
 Data/
+components/
 portable.ini
 
 # Arquivos da NVIDIA que nunca devem ir para o repositório

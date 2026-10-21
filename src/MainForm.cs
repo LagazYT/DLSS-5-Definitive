@@ -117,10 +117,15 @@ namespace Dlss5Injector
             ResumeLayout(false);
 
             slDir = Settings.Get("streamline");
-            if (!Installer.IsStreamlineDir(slDir)) slDir = FindStreamline();
+            if (!Installer.IsStreamlineDir(slDir))
+            {
+                slDir = FindStreamline();
+                if (slDir != null) Settings.Set("streamline", slDir);
+            }
             UpdateSlRow();
+            ImportStreamlineAsync();
             string nr = Settings.Get("nr");
-            string found = NrRuntime.FindCandidate(slDir);
+            string found = NrRuntime.FindCandidate(slDir, AppPaths.Components);
             if (string.IsNullOrEmpty(nr) || !File.Exists(nr) ||
                 (found != null && Settings.Get("nrManual") != "1" && Util.FileVer(found) > Util.FileVer(nr))) nr = found;
             SetNr(nr, false);
@@ -165,10 +170,10 @@ namespace Dlss5Injector
         /// <summary>Procura de novo a runtime do DLSS 5 e o Streamline quando eles estão faltando.</summary>
         void RedetectFiles()
         {
-            if (busy) return;
+            if (busy || importingNr || importingSl) return;
             if (string.IsNullOrEmpty(nrPath) || !File.Exists(nrPath))
             {
-                string found = NrRuntime.FindCandidate(slDir);
+                string found = NrRuntime.FindCandidate(slDir, AppPaths.Components);
                 if (found != null)
                 {
                     Log(L.T("Runtime do DLSS 5 encontrada: ") + found);
@@ -178,7 +183,7 @@ namespace Dlss5Injector
             if (!Installer.IsStreamlineDir(slDir))
             {
                 string sl = FindStreamline();
-                if (sl != null) { slDir = sl; UpdateSlRow(); RefreshPlan(); }
+                if (sl != null) { slDir = sl; UpdateSlRow(); RefreshPlan(); ImportStreamlineAsync(); }
             }
         }
 
@@ -356,6 +361,12 @@ namespace Dlss5Injector
         {
             base.OnHandleCreated(e);
             Theme.DarkTitleBar(this);
+            lock (pendingUi)
+            {
+                uiReady = true;
+                foreach (Action a in pendingUi) BeginInvoke(a);
+                pendingUi.Clear();
+            }
         }
 
         Panel NewPage()
@@ -682,9 +693,23 @@ namespace Dlss5Injector
             t.Start();
         }
 
+        // Ações vindas de threads antes de a janela existir (ex.: uma cópia que termina durante a abertura) ficam na
+        // fila e rodam assim que a janela é criada — antes elas eram descartadas.
+        readonly List<Action> pendingUi = new List<Action>();
+        bool uiReady;
+
         void SafeInvoke(Action a)
         {
-            try { if (!IsDisposed && IsHandleCreated) BeginInvoke(a); } catch { }
+            try
+            {
+                if (IsDisposed) return;
+                lock (pendingUi)
+                {
+                    if (!uiReady) { pendingUi.Add(a); return; }
+                }
+                BeginInvoke(a);
+            }
+            catch { }
         }
 
         GameCard FindCard(GameEntry g)
@@ -1020,8 +1045,43 @@ namespace Dlss5Injector
             t.Start();
         }
 
+        bool importingSl;
+
+        /// <summary>Streamline fora da pasta do app: copia o necessário para components\streamline e passa a usar a cópia.</summary>
+        void ImportStreamlineAsync()
+        {
+            string src = slDir;
+            if (importingSl || !Installer.IsStreamlineDir(src) || AppPaths.IsInside(src, AppPaths.Components)) return;
+            importingSl = true;
+            rowSl.Set(Theme.GSync, Theme.Info, L.T("Copiando para a pasta do app..."));
+            if (rowSlCfg != null) rowSlCfg.Set(rowSl.Glyph, rowSl.Accent, rowSl.Detail);
+            Thread t = new Thread(delegate()
+            {
+                string dest = null;
+                Exception err = null;
+                try { dest = Installer.ImportStreamline(src, AppPaths.Components); } catch (Exception ex) { err = ex; }
+                SafeInvoke(delegate
+                {
+                    importingSl = false;
+                    if (err == null && Installer.IsStreamlineDir(dest))
+                    {
+                        if (slDir == src) slDir = dest;
+                        Settings.Set("streamline", slDir);
+                        Log(L.T("Streamline copiado para a pasta do app: ") + dest);
+                    }
+                    else if (err != null) Log(L.T("Não foi possível copiar para a pasta do app: ") + err.Message);
+                    UpdateSlRow();
+                });
+            });
+            t.IsBackground = true;
+            t.Start();
+        }
+
         static string FindStreamline()
         {
+            // 1º: a cópia na pasta do app
+            string own = Path.Combine(AppPaths.Components, "streamline");
+            if (Installer.IsStreamlineDir(own)) return own;
             string d = AppDomain.CurrentDomain.BaseDirectory;
             for (int i = 0; i < 4 && d != null; i++)
             {
@@ -1115,6 +1175,8 @@ namespace Dlss5Injector
             b2.SetBounds(430, 118, 82, 30);
             b2.Click += delegate { BrowseNr(); };
             cFiles.Controls.Add(b2);
+            Label lblComp = TextLabel(cFiles, L.T("Guardados na pasta do app: ") + AppPaths.Components, 18, 160, 492, 30, Theme.F(8f), Theme.Dim);
+            lblComp.AutoEllipsis = true;
 
             // ---- Dados do aplicativo
             Card cData = AddCard(P, null, L.T("Dados do aplicativo"), 568, 212, 528, 220);
@@ -1234,6 +1296,7 @@ namespace Dlss5Injector
                 slDir = d.SelectedPath;
                 Settings.Set("streamline", slDir);
                 UpdateSlRow();
+                ImportStreamlineAsync();
             }
         }
 
@@ -1247,7 +1310,50 @@ namespace Dlss5Injector
             }
         }
 
+        bool importingNr;
+
         void SetNr(string path, bool manual)
+        {
+            // Runtime fora da pasta do app (Downloads, escolhida, arrastada): copia para components e usa a cópia,
+            // assim o app continua funcionando mesmo se o arquivo original for apagado.
+            if (!string.IsNullOrEmpty(path) && File.Exists(path) && !AppPaths.IsInside(path, AppPaths.Components))
+            {
+                ImportNr(path, manual);
+                return;
+            }
+            UseNr(path, manual);
+        }
+
+        void ImportNr(string src, bool manual)
+        {
+            if (importingNr) return;
+            importingNr = true;
+            nrInfo = null;
+            nrPath = src;
+            SetNrRow(Theme.GSync, Theme.Info, L.T("Copiando para a pasta do app..."));
+            Thread t = new Thread(delegate()
+            {
+                string dest = null;
+                Exception err = null;
+                try { dest = NrRuntime.Import(src, AppPaths.Components); } catch (Exception ex) { err = ex; }
+                SafeInvoke(delegate
+                {
+                    importingNr = false;
+                    if (err != null)
+                    {
+                        Log(L.T("Não foi possível copiar para a pasta do app: ") + err.Message);
+                        UseNr(src, manual);   // continua usando o original
+                        return;
+                    }
+                    Log(L.T("Runtime do DLSS 5 copiada para a pasta do app: ") + dest);
+                    UseNr(dest, manual);
+                });
+            });
+            t.IsBackground = true;
+            t.Start();
+        }
+
+        void UseNr(string path, bool manual)
         {
             nrInfo = null;
             nrPath = path;
@@ -1485,7 +1591,7 @@ namespace Dlss5Injector
             if (string.IsNullOrEmpty(nrPath) || !File.Exists(nrPath))
             {
                 // Procura de novo antes de reclamar (o arquivo pode ter sido colocado depois que o app abriu)
-                string again = NrRuntime.FindCandidate(slDir);
+                string again = NrRuntime.FindCandidate(slDir, AppPaths.Components);
                 if (again != null)
                 {
                     SetNr(again, false);

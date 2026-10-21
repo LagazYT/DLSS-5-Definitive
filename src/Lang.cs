@@ -482,6 +482,22 @@ namespace Dlss5Injector
               "nvngx.dll_dlssnr.dll es el \"forwarder\" que ya viene dentro de OptiScaler F5 — la app lo instala sola. ");
             A("A runtime é o nvngx_dlssnr.dll da NVIDIA (cerca de 250 MB).", "The runtime is NVIDIA's nvngx_dlssnr.dll (about 250 MB).",
               "El runtime es el nvngx_dlssnr.dll de NVIDIA (unos 250 MB).");
+            A("Copiando para a pasta do app...", "Copying into the app folder...", "Copiando a la carpeta de la app...");
+            A("Runtime do DLSS 5 copiada para a pasta do app: ", "DLSS 5 runtime copied to the app folder: ", "Runtime de DLSS 5 copiado a la carpeta de la app: ");
+            A("Streamline copiado para a pasta do app: ", "Streamline copied to the app folder: ", "Streamline copiado a la carpeta de la app: ");
+            A("Não foi possível copiar para a pasta do app: ", "Could not copy into the app folder: ", "No se pudo copiar a la carpeta de la app: ");
+            A("Guardados na pasta do app: ", "Stored in the app folder: ", "Guardados en la carpeta de la app: ");
+            A("Copiando a runtime do DLSS 5...", "Copying the DLSS 5 runtime...", "Copiando el runtime de DLSS 5...");
+            A("Copiando o Streamline...", "Copying Streamline...", "Copiando Streamline...");
+            A("Encontrada — será copiada para a pasta do app: ", "Found — it will be copied into the app folder: ", "Encontrado — se copiará a la carpeta de la app: ");
+            A("Não encontrada — escolha agora (opcional) ou depois no app", "Not found — choose it now (optional) or later in the app",
+              "No encontrado — elíjalo ahora (opcional) o más tarde en la app");
+            A("Encontrado — será copiado para a pasta do app: ", "Found — it will be copied into the app folder: ", "Encontrado — se copiará a la carpeta de la app: ");
+            A("Será baixado da NVIDIA quando você instalar o DLSS 5 num jogo", "Will be downloaded from NVIDIA when you install DLSS 5 in a game",
+              "Se descargará de NVIDIA cuando instale DLSS 5 en un juego");
+            A("Escolher...", "Choose...", "Elegir...");
+            A(" foi removido.", " was removed.", " fue eliminado.");
+            A(" instalado em ", " installed in ", " instalado en ");
             A("Não encontrado — coloque o nvngx_dlssnr.dll em Downloads, arraste para cá ou clique em Alterar",
               "Not found — put nvngx_dlssnr.dll in Downloads, drag it here or click Change",
               "No encontrado — ponga el nvngx_dlssnr.dll en Descargas, arrástrelo aquí o haga clic en Cambiar");

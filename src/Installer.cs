@@ -94,6 +94,36 @@ namespace Dlss5Injector
             return !string.IsNullOrEmpty(d) && File.Exists(Path.Combine(SlBin(d), "nvngx_dlss.dll")) && File.Exists(Path.Combine(SlBin(d), "sl.interposer.dll"));
         }
 
+        /// <summary>Arquivos do Streamline SDK que o app usa (o resto do SDK, ~270 MB, não é necessário).</summary>
+        static readonly string[] SlNeeded = {
+            "nvngx_dlss.dll", "nvngx_dlssd.dll", "nvngx_dlssg.dll", "sl.interposer.dll", "sl.common.dll", "sl.dlss_g.dll",
+            "sl.reflex.dll", "sl.pcl.dll", "nvngx_dlss.license.txt", "reflex.license.txt"
+        };
+
+        /// <summary>
+        /// Copia o necessário do Streamline para &lt;componentsDir&gt;\streamline (mesmo layout bin\x64 do SDK) e devolve
+        /// essa pasta. Só copia arquivos que faltam ou mudaram.
+        /// </summary>
+        public static string ImportStreamline(string src, string componentsDir)
+        {
+            string dest = Path.Combine(componentsDir, "streamline");
+            if (string.Equals(Path.GetFullPath(src).TrimEnd('\\'), Path.GetFullPath(dest).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)) return dest;
+            string bin = SlBin(dest);
+            Directory.CreateDirectory(bin);
+            foreach (string n in SlNeeded)
+            {
+                string s = Path.Combine(SlBin(src), n), d = Path.Combine(bin, n);
+                if (!File.Exists(s)) continue;
+                if (File.Exists(d) && new FileInfo(d).Length == new FileInfo(s).Length && Util.FileVer(d) == Util.FileVer(s)) continue;
+                File.Copy(s, d + ".copy", true);
+                if (File.Exists(d)) { File.SetAttributes(d, FileAttributes.Normal); File.Delete(d); }
+                File.Move(d + ".copy", d);
+            }
+            foreach (string lic in new[] { "license.txt", "3rd-party-licenses.md" })
+                if (File.Exists(Path.Combine(src, lic))) File.Copy(Path.Combine(src, lic), Path.Combine(dest, lic), true);
+            return IsStreamlineDir(dest) ? dest : src;
+        }
+
         // ------------------------------------------------------------------ helpers
 
         void EnsureDir(string dir)
@@ -174,7 +204,15 @@ namespace Dlss5Injector
             if (needSl && !IsStreamlineDir(slDir))
             {
                 log(L.T("Pasta do Streamline SDK não encontrada neste PC — baixando a versão oficial da NVIDIA."));
-                slDir = dl.EnsureStreamline();
+                string downloaded = dl.EnsureStreamline();
+                // Guarda na pasta do app (components) e descarta a cópia do cache de downloads
+                slDir = ImportStreamline(downloaded, AppPaths.Components);
+                if (slDir != downloaded) { try { Directory.Delete(downloaded, true); } catch { } }
+                log(L.T("Streamline copiado para a pasta do app: ") + slDir);
+            }
+            else if (needSl && !AppPaths.IsInside(slDir, AppPaths.Components))
+            {
+                slDir = ImportStreamline(slDir, AppPaths.Components);
             }
 
             log("== Instalando: " + Planner.Name(p.Method) + " em " + g.ExeDir);

@@ -75,7 +75,15 @@ Modelo DLSS Frame Generation da NVIDIA, de **1X (desligado) a 6X**, também em j
 
 ## Runtime do DLSS 5
 
-O arquivo `nvngx_dlssnr.dll` (runtime do Neural Rendering) **não é distribuído** pelo app, pelo OptiScaler, pelo RenoDX nem pelo Streamline SDK. Coloque-o na pasta Downloads ou selecione-o em **Alterar**. O app confere a assinatura da NVIDIA e se a versão combina com a sua GPU.
+O arquivo `nvngx_dlssnr.dll` (runtime do Neural Rendering) **não é distribuído** pelo app, pelo OptiScaler, pelo RenoDX nem pelo Streamline SDK. Para o app usar o arquivo, você pode:
+
+- deixá-lo na pasta Downloads;
+- selecioná-lo em **Alterar**;
+- arrastá-lo para a janela do app.
+
+O app confere a assinatura da NVIDIA e se a versão combina com a sua GPU.
+
+A runtime e o Streamline são **copiados para a pasta do próprio app** (`components\`). O instalador faz isso na hora da instalação, e o app faz quando encontra os arquivos. Depois disso, você pode apagar os originais de Downloads. O desinstalador remove a pasta `components` junto com o app.
 
 ## Compilar
 

@@ -56,6 +56,41 @@ namespace Dlss5Injector
                 return p;
             }
         }
+
+        static string components;
+
+        /// <summary>
+        /// Pasta "components" dentro da pasta do próprio app (instalado ou portable): guarda a runtime do DLSS 5 e o
+        /// Streamline, para o app não depender de arquivos em Downloads. Se a pasta do app não aceitar gravação,
+        /// usa a pasta de dados.
+        /// </summary>
+        public static string Components
+        {
+            get
+            {
+                if (components != null) return components;
+                string d = Path.Combine(AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\'), "components");
+                try
+                {
+                    Directory.CreateDirectory(d);
+                    if (Util.CanWrite(d)) { components = d; return d; }
+                }
+                catch { }
+                components = Path.Combine(Root, "components");
+                Directory.CreateDirectory(components);
+                return components;
+            }
+        }
+
+        public static bool IsInside(string path, string dir)
+        {
+            if (string.IsNullOrEmpty(path) || string.IsNullOrEmpty(dir)) return false;
+            try
+            {
+                return Path.GetFullPath(path).StartsWith(Path.GetFullPath(dir).TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return false; }
+        }
     }
 
     public static class Settings
@@ -250,21 +285,55 @@ namespace Dlss5Injector
             return i;
         }
 
-        public static string FindCandidate(string streamlineDir)
+        /// <summary>
+        /// Procura a runtime. As pastas em <paramref name="preferred"/> (ex.: a pasta components do app) vêm primeiro e
+        /// ganham empates de versão; nas demais só uma versão mais nova substitui.
+        /// </summary>
+        public static string FindCandidate(string streamlineDir, params string[] preferred)
         {
             string newest = null;
             Version best = new Version(0, 0);
-            foreach (string f in Candidates(streamlineDir))
+            foreach (string f in Candidates(streamlineDir, preferred))
             {
+                if (!IsRuntimeFile(f)) continue;
                 Version v = Util.FileVer(f);
                 if (newest == null || v > best) { newest = f; best = v; }
             }
             return newest;
         }
 
-        static IEnumerable<string> Candidates(string streamlineDir)
+        /// <summary>A runtime da NVIDIA tem centenas de MB; o forwarder do OptiScaler (nvngx.dll_dlssnr.dll) tem ~150 KB.</summary>
+        public static bool IsRuntimeFile(string f)
+        {
+            try
+            {
+                return Path.GetFileName(f).Equals(FileName, StringComparison.OrdinalIgnoreCase) && new FileInfo(f).Length > (20L << 20);
+            }
+            catch { return false; }
+        }
+
+        /// <summary>
+        /// Copia a runtime para <paramref name="destDir"/> (a pasta components do app) e devolve o caminho da cópia.
+        /// Se a cópia já existe com o mesmo tamanho e versão, não copia de novo.
+        /// </summary>
+        public static string Import(string src, string destDir)
+        {
+            string dest = Path.Combine(destDir, FileName);
+            if (string.Equals(Path.GetFullPath(src), Path.GetFullPath(dest), StringComparison.OrdinalIgnoreCase)) return dest;
+            Directory.CreateDirectory(destDir);
+            if (File.Exists(dest) && new FileInfo(dest).Length == new FileInfo(src).Length && Util.FileVer(dest) == Util.FileVer(src))
+                return dest;
+            string tmp = dest + ".copy";
+            File.Copy(src, tmp, true);
+            if (File.Exists(dest)) { File.SetAttributes(dest, FileAttributes.Normal); File.Delete(dest); }
+            File.Move(tmp, dest);
+            return dest;
+        }
+
+        static IEnumerable<string> Candidates(string streamlineDir, string[] preferred)
         {
             List<string> dirs = new List<string>();
+            if (preferred != null) dirs.AddRange(preferred);
             dirs.Add(Path.Combine(AppPaths.Root, "runtime"));
             if (!string.IsNullOrEmpty(streamlineDir))
             {
