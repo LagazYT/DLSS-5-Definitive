@@ -330,6 +330,79 @@ namespace Dlss5Injector
             return dest;
         }
 
+        static System.IO.Compression.ZipArchiveEntry ZipEntry(System.IO.Compression.ZipArchive z)
+        {
+            System.IO.Compression.ZipArchiveEntry best = null;
+            foreach (System.IO.Compression.ZipArchiveEntry e in z.Entries)
+                if (e.Name.Equals(FileName, StringComparison.OrdinalIgnoreCase) && e.Length > (20L << 20) && (best == null || e.Length > best.Length))
+                    best = e;
+            return best;
+        }
+
+        /// <summary>Zip que traz o nvngx_dlssnr.dll da NVIDIA (ex.: "DLL DLSS 5.zip").</summary>
+        public static bool IsRuntimeZip(string zip)
+        {
+            try
+            {
+                if (!zip.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) || !File.Exists(zip)) return false;
+                using (System.IO.Compression.ZipArchive z = System.IO.Compression.ZipFile.OpenRead(zip)) return ZipEntry(z) != null;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>A runtime (dll) ou um zip com ela.</summary>
+        public static bool IsRuntimeSource(string f)
+        {
+            return IsRuntimeFile(f) || IsRuntimeZip(f);
+        }
+
+        /// <summary>
+        /// Extrai o nvngx_dlssnr.dll do zip para &lt;destDir&gt;. Só aceita se tiver assinatura válida da NVIDIA.
+        /// </summary>
+        public static string ExtractFromZip(string zip, string destDir)
+        {
+            string dest = Path.Combine(destDir, FileName);
+            Directory.CreateDirectory(destDir);
+            using (System.IO.Compression.ZipArchive z = System.IO.Compression.ZipFile.OpenRead(zip))
+            {
+                System.IO.Compression.ZipArchiveEntry e = ZipEntry(z);
+                if (e == null) throw new Exception(L.T("O zip não tem o nvngx_dlssnr.dll."));
+                if (File.Exists(dest) && new FileInfo(dest).Length == e.Length && Signature.IsNvidiaSigned(dest)) return dest;
+                string tmp = dest + ".copy";
+                using (Stream s = e.Open())
+                using (FileStream f = File.Create(tmp)) s.CopyTo(f);
+                if (!Signature.IsNvidiaSigned(tmp))
+                {
+                    try { File.Delete(tmp); } catch { }
+                    throw new Exception(L.T("O nvngx_dlssnr.dll do zip não tem assinatura válida da NVIDIA."));
+                }
+                if (File.Exists(dest)) { File.SetAttributes(dest, FileAttributes.Normal); File.Delete(dest); }
+                File.Move(tmp, dest);
+            }
+            return dest;
+        }
+
+        /// <summary>Copia a runtime (dll) ou extrai do zip para &lt;destDir&gt;.</summary>
+        public static string ImportAny(string src, string destDir)
+        {
+            return src.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) ? ExtractFromZip(src, destDir) : Import(src, destDir);
+        }
+
+        /// <summary>Primeiro zip com a runtime nas pastas indicadas (só o nível de cima de cada pasta), o mais novo antes.</summary>
+        public static string FindZip(params string[] dirs)
+        {
+            foreach (string d in dirs)
+            {
+                if (string.IsNullOrEmpty(d) || !Directory.Exists(d)) continue;
+                string[] zips;
+                try { zips = Directory.GetFiles(d, "*.zip"); } catch { continue; }
+                Array.Sort(zips, (a, b) => File.GetLastWriteTimeUtc(b).CompareTo(File.GetLastWriteTimeUtc(a)));
+                foreach (string z in zips)
+                    if (IsRuntimeZip(z)) return z;
+            }
+            return null;
+        }
+
         static IEnumerable<string> Candidates(string streamlineDir, string[] preferred)
         {
             List<string> dirs = new List<string>();

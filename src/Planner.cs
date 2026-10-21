@@ -15,6 +15,7 @@ namespace Dlss5Injector
         public bool Log;
         public int Passes = 1;
         public bool RunBeforeSR = true;
+        public bool Hdr;                // [HDR] Enabled=true (OptiScaler 0.1.33+, só DX11/DX12)
     }
 
     public class InstallPlan
@@ -235,24 +236,30 @@ namespace Dlss5Injector
             bool fg = o.FrameGen;
             int cap;
             string fgLabel;
-            string fgOut = FgOutput(optiApi, out cap, out fgLabel);
+            string fgOut = FgOutput(optiApi, o.FgDynamic ? 2 : o.FgMult, out cap, out fgLabel);
             int mult = Math.Min(o.FgMult, cap);
             if (fg && g.HasDlssG && nativeUpscaler)
             {
                 // O jogo já tem DLSS-G: o OptiScaler só força o multiplicador no MFG do próprio jogo.
-                fg = false;
                 int nat = Math.Min(o.FgMult, cap);
+                if (Gpu.IsNvidia && Gpu.Series == 40 && fgOut == "xefg")
+                {
+                    // RTX 40 acima de 2X: o DLSS-G do jogo só faz 2X; o XeSS-FG do OptiScaler gera 3X/4X.
+                    p.Warnings.Add(L.T("RTX 40 acima de 2X: desligue o Frame Generation do jogo; o OptiScaler gera os quadros com XeSS-FG."));
+                    goto fgDone;
+                }
+                fg = false;
                 if (Gpu.Series >= 40)
                 {
                     p.SetIni("DLSSG", "OverrideInterpolationCount", (nat - 1).ToString());
                     if (o.FgDynamic && Gpu.Series >= 50) p.SetIni("DLSSG", "OverrideForceDMFG", "true");
-                    if (Gpu.Series == 40 && nat > 2) AdaUnlock(p);
                 }
                 else if (fgOut == "dlssg") AddSm86(p, g, nat, true);   // RTX 30/20: libera o DLSS-G do próprio jogo
                 else p.Warnings.Add(L.T("O DLSS Frame Generation do jogo precisa de uma GPU NVIDIA RTX."));
                 if (fgOut == "dlssg" || Gpu.Series >= 40) p.Steps.Add(L.T("MFG por IA do próprio jogo (DLSS-G) em ") + (o.FgDynamic && Gpu.Series >= 50 ? L.T("modo dinâmico") : nat + "X") +
                             L.T(" — ative o Frame Generation no menu do jogo"));
             }
+            fgDone:
 
             if (nativeUpscaler)
             {
@@ -293,7 +300,6 @@ namespace Dlss5Injector
                     p.SetIni("FrameGen", "External", "false");
                     p.SetIni("DLSSG", "InterpolationCount", (Math.Max(2, mult) - 1).ToString());
                     if (dyn) p.SetIni("DLSSG", "ForceDMFG", "true");
-                    if (Gpu.Series == 40 && mult > 2) AdaUnlock(p);
                     if (Gpu.Series >= 20 && Gpu.Series <= 30) AddSm86(p, g, Math.Max(2, mult), false);
                     p.CopyStreamlineFG = true;
                     p.Steps.Add(L.T("Streamline ") + L.T("(sl.interposer/common/dlss_g/reflex/pcl + nvngx_dlssg 310.9) em OptiScaler\\streamline"));
@@ -310,6 +316,20 @@ namespace Dlss5Injector
                 p.SetIni("FrameGen", "Enabled", "false");
             }
 
+            if (o.Hdr)
+            {
+                bool hdrApi = optiApi == GfxApi.DX12 || optiApi == GfxApi.DX11;
+                if (!hdrApi)
+                    p.Warnings.Add(L.T("Saída HDR do OptiScaler só funciona em DX11/DX12 (não em Vulkan/DXVK) — opção ignorada."));
+                else if (fg && fgOut == "dlssg")
+                    p.Warnings.Add(L.T("Saída HDR do OptiScaler não funciona junto com o DLSS Frame Generation — opção ignorada. Desligue o Frame Gen para usar o HDR."));
+                else
+                {
+                    p.SetIni("HDR", "Enabled", "true");
+                    p.Steps.Add(L.T("Saída HDR do OptiScaler ([HDR] Enabled=true) — ative o HDR do Windows"));
+                }
+            }
+
             if (o.Log)
             {
                 p.SetIni("Log", "LogToFile", "true");
@@ -321,13 +341,20 @@ namespace Dlss5Injector
 
         /// <summary>
         /// Melhor Frame Gen por IA para a GPU/API e o multiplicador máximo dele.
-        /// RTX 50: DLSS MFG nativo (até 6X). RTX 40: DLSS-G + desbloqueio MFG embutido no fork (até 4X).
-        /// RTX 30/20 em DX12: DLSS-G da NVIDIA via dlssg_for_sm86 (até 4X). Outros: XeSS-FG / FSR-FG.
+        /// RTX 50: DLSS MFG nativo (até 6X). RTX 40: DLSS-G 2X; 3X/4X pelo XeSS-FG (o OptiScaler 0.1.33
+        /// removeu o desbloqueio de MFG da RTX 40). RTX 30/20 em DX12: DLSS-G via dlssg_for_sm86 (até 4X).
+        /// Outros: XeSS-FG / FSR-FG.
         /// </summary>
-        public static string FgOutput(GfxApi optiApi, out int cap, out string label)
+        public static string FgOutput(GfxApi optiApi, int mult, out int cap, out string label)
         {
             if (Gpu.IsNvidia && Gpu.Series >= 50) { cap = 6; label = L.T("NVIDIA DLSS 4 Multi Frame Generation"); return "dlssg"; }
-            if (Gpu.IsNvidia && Gpu.Series == 40) { cap = 4; label = L.T("NVIDIA DLSS Multi Frame Generation (desbloqueio RTX 40)"); return "dlssg"; }
+            if (Gpu.IsNvidia && Gpu.Series == 40)
+            {
+                if (mult > 2 && optiApi != GfxApi.Vulkan) { cap = 4; label = L.T("Intel XeSS Frame Generation (IA) — 3X/4X na RTX 40"); return "xefg"; }
+                cap = 2;
+                label = L.T("NVIDIA DLSS Frame Generation");
+                return "dlssg";
+            }
             if (Gpu.IsNvidia && Gpu.Series >= 20 && optiApi == GfxApi.DX12)
             {
                 cap = 4;
@@ -338,12 +365,6 @@ namespace Dlss5Injector
             cap = 2;
             label = L.T("AMD FSR Frame Generation");
             return "fsrfg";
-        }
-
-        static void AdaUnlock(InstallPlan p)
-        {
-            p.SetIni("DLSSG", "AdaMfgUnlock", "true");
-            p.Warnings.Add(L.T("RTX 40 acima de 2X usa o desbloqueio de MFG embutido no OptiScaler F5 (experimental). Se travar, volte para 2X."));
         }
 
         /// <summary>RTX 30/20: módulo dlssg_for_sm86 ao lado do jogo, com o runtime DLSS-G oficial da NVIDIA.</summary>

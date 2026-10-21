@@ -25,10 +25,15 @@ Abas
 Runtime do DLSS 5
   O app usa o nvngx_dlssnr.dll que encontrar em Downloads (prefere a versão mais nova e confere
   a assinatura da NVIDIA). Ele não vem no OptiScaler, no RenoDX nem no Streamline SDK.
+  Um .zip com o nvngx_dlssnr.dll dentro também serve: arraste para a janela, escolha em Alterar ou
+  deixe ao lado do instalador. A dll é extraída para a pasta components do app.
+
+Saída HDR (Injetor)
+  Liga o HDR do OptiScaler F5 (DX11/DX12; ative o HDR do Windows). Não funciona com o DLSS Frame Generation.
 
 Multi Frame Generation por IA (aba Frame Gen) - modelo DLSS-G da NVIDIA, também em jogos sem suporte
   RTX 50 ............ DLSS 4 Multi Frame Generation nativo, 2X a 6X, ou dinâmico
-  RTX 40 ............ 2X nativo; 3X-4X pelo desbloqueio de MFG embutido no OptiScaler F5 (experimental)
+  RTX 40 ............ 2X nativo (DLSS-G); 3X-4X pelo Intel XeSS Frame Generation do OptiScaler F5
   RTX 30 / 20 ....... até 4X com dlssg_for_sm86 (sdli1995, GPLv3), baixado do GitHub na instalação;
                       usa o nvngx_dlssg 310.9.16 oficial da NVIDIA (assinatura conferida). DX12. Experimental.
   Outras GPUs ....... Intel XeSS Frame Generation (DX12) / AMD FSR FG (Vulkan)

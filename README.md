@@ -69,7 +69,7 @@ Modelo DLSS Frame Generation da NVIDIA, de **1X (desligado) a 6X**, também em j
 | GPU | Como |
 |---|---|
 | RTX 50 | DLSS 4 Multi Frame Generation nativo, até 6X, ou modo dinâmico |
-| RTX 40 | 2X nativo; 3X–4X pelo desbloqueio de MFG embutido no OptiScaler F5 *(experimental)* |
+| RTX 40 | 2X DLSS Frame Generation nativo; 3X–4X pelo Intel XeSS Frame Generation do OptiScaler F5 (o desbloqueio de MFG da RTX 40 saiu no OptiScaler F5 0.1.33) |
 | RTX 30 / 20 | Até 4X com [dlssg_for_sm86](https://github.com/sdli1995/dlssg_for_sm86), baixado automaticamente *(experimental, DX12)* |
 | Outras | Intel XeSS Frame Generation / AMD FSR Frame Generation |
 
@@ -80,6 +80,13 @@ O arquivo `nvngx_dlssnr.dll` (runtime do Neural Rendering) **não é distribuíd
 - deixá-lo na pasta Downloads;
 - selecioná-lo em **Alterar**;
 - arrastá-lo para a janela do app.
+
+Também vale um **.zip com o `nvngx_dlssnr.dll` dentro**: arraste o zip para a janela, escolha-o em **Alterar** ou deixe-o ao lado do `DLSS 5 Definitive Setup.exe`, em Downloads ou na Área de Trabalho. O app e o instalador extraem a dll para `components\` (só se tiver assinatura válida da NVIDIA).
+
+Para uso próprio, `build.bat "C:\caminho\DLL DLSS 5.zip"` gera também `dist\privado\DLSS 5 Definitive Setup (com runtime).exe`, um instalador com o zip embutido que deixa o zip na pasta de instalação. Não publique esse instalador: o arquivo é da NVIDIA.
+
+### Saída HDR
+A opção **Saída HDR (DX11/DX12)** do Injetor liga o `[HDR]` do OptiScaler F5 0.1.33 (ative também o HDR do Windows). Não funciona em Vulkan/DXVK nem junto com o DLSS Frame Generation.
 
 O app confere a assinatura da NVIDIA e se a versão combina com a sua GPU.
 

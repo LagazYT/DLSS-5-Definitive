@@ -34,7 +34,7 @@ namespace Dlss5Injector
         DarkCombo cmbExe, cmbApi, cmbMethod;
         InfoTile tApi, tEngine, tArch, tUpscale, tAnti, tMods;
         Label lblNotes, lblStatus;
-        ToggleSwitch tgUpdate, tgLog, tgBefore;
+        ToggleSwitch tgUpdate, tgLog, tgBefore, tgHdr;
         ModernButton btnFgLink;
         Segmented segPasses;
         StatusRow rowSl, rowNr;
@@ -194,6 +194,13 @@ namespace Dlss5Injector
         bool AcceptNrFile(string file)
         {
             string n = Path.GetFileName(file);
+            if (n.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+            {
+                if (NrRuntime.IsRuntimeZip(file)) return true;
+                MessageBox.Show(this, L.T("Este zip não tem a runtime do DLSS 5 (nvngx_dlssnr.dll da NVIDIA, cerca de 250 MB)."),
+                    Program.AppName, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return false;
+            }
             if (n.Equals("nvngx.dll_dlssnr.dll", StringComparison.OrdinalIgnoreCase) ||
                 (!n.Equals(NrRuntime.FileName, StringComparison.OrdinalIgnoreCase) && new FileInfo(file).Length < (20L << 20)))
             {
@@ -801,7 +808,7 @@ namespace Dlss5Injector
             txtLog.SetBounds(18, 44, 496, 68);
             cLog.Controls.Add(txtLog);
 
-            Card cCfg = AddCard(P, "3", L.T("Configuração"), 568, 84 - o, 528, 340);
+            Card cCfg = AddCard(P, "3", L.T("Configuração"), 568, 84 - o, 528, 370);
             Place(cCfg, new FieldLabel(L.T("Método (escolhido conforme a compatibilidade do jogo)")), 18, 50);
             cmbMethod = Combo(cCfg, 16, 70, 496);
             cmbMethod.SelectedIndexChanged += delegate { if (!loadingUi) RefreshPlan(); };
@@ -824,26 +831,27 @@ namespace Dlss5Injector
             tgBefore = Toggle(cCfg, L.T("NR antes do upscaler"), true, 272, 180, 240);
             tgUpdate = Toggle(cCfg, L.T("Atualizar DLSS do jogo (310.9)"), true, 16, 212, 240);
             tgLog = Toggle(cCfg, L.T("Log de diagnóstico"), false, 272, 212, 240);
+            tgHdr = Toggle(cCfg, L.T("Saída HDR (DX11/DX12)"), false, 16, 244, 240);
 
             rowSl = new StatusRow(L.T("NVIDIA Streamline SDK"));
-            rowSl.SetBounds(16, 250, 400, 42);
+            rowSl.SetBounds(16, 280, 400, 42);
             cCfg.Controls.Add(rowSl);
             btnSl = new ModernButton(L.T("Alterar"), null, ButtonKind.Ghost);
-            btnSl.SetBounds(430, 256, 82, 30);
+            btnSl.SetBounds(430, 286, 82, 30);
             btnSl.Click += delegate { BrowseStreamline(); };
             cCfg.Controls.Add(btnSl);
 
             rowNr = new StatusRow(L.T("Runtime DLSS 5 (nvngx_dlssnr.dll)"));
-            rowNr.SetBounds(16, 292, 400, 42);
+            rowNr.SetBounds(16, 322, 400, 42);
             cCfg.Controls.Add(rowNr);
             btnNr = new ModernButton(L.T("Alterar"), null, ButtonKind.Ghost);
-            btnNr.SetBounds(430, 298, 82, 30);
+            btnNr.SetBounds(430, 328, 82, 30);
             btnNr.Click += delegate { BrowseNr(); };
             cCfg.Controls.Add(btnNr);
 
-            Card cPlan = AddCard(P, "4", L.T("Plano de instalação"), 568, 436 - o, 528, 292);
+            Card cPlan = AddCard(P, "4", L.T("Plano de instalação"), 568, 466 - o, 528, 262);
             steps = new StepsView();
-            steps.SetBounds(18, 50, 496, 232);
+            steps.SetBounds(18, 50, 496, 202);
             cPlan.Controls.Add(steps);
 
             btnInstall = new ModernButton(L.T("  Instalar DLSS 5"), Theme.GDownload, ButtonKind.Primary);
@@ -864,7 +872,7 @@ namespace Dlss5Injector
             bar.SetBounds(568, 778 - o, 528, 6);
             P.Controls.Add(bar);
 
-            foreach (ToggleSwitch t in new[] { tgUpdate, tgLog, tgBefore })
+            foreach (ToggleSwitch t in new[] { tgUpdate, tgLog, tgBefore, tgHdr })
                 t.CheckedChanged += delegate { RefreshPlan(); };
         }
 
@@ -929,7 +937,7 @@ namespace Dlss5Injector
             gen.Controls.Add(rowGen30);
             TextLabel(gen,
                 L.T("RTX 50 — DLSS 4 Multi Frame Generation nativo, 2X a 6X, ou modo dinâmico (acompanha o Hz do monitor).\r\n") +
-                L.T("RTX 40 — DLSS Frame Generation 2X nativo; 3X e 4X pelo desbloqueio de MFG embutido no OptiScaler F5 (experimental, sem arquivo extra).\r\n") +
+                L.T("RTX 40 — DLSS Frame Generation 2X nativo; 3X e 4X pelo Intel XeSS Frame Generation do OptiScaler F5 (o desbloqueio de MFG da RTX 40 saiu na versão 0.1.33).\r\n") +
                 L.T("RTX 30 / 20 — DLSS Multi Frame Generation até 4X pelo dlssg_for_sm86 (sdli1995, GPLv3), baixado automaticamente do GitHub na instalação. ") +
                 L.T("Ele usa o runtime oficial da NVIDIA (nvngx_dlssg 310.9.16, assinatura conferida). Requer DX12 (ou DX9 via dgVoodoo); experimental.\r\n") +
                 L.T("Jogos sem Frame Generation próprio recebem o MFG pelo OptiScaler; jogos que já têm recebem o multiplicador forçado no FG do próprio jogo."),
@@ -957,8 +965,12 @@ namespace Dlss5Injector
             else if (api == GfxApi.DX10) api = GfxApi.Vulkan; // DXVK → Vulkan
             int cap;
             string label;
-            Planner.FgOutput(api, out cap, out label);
+            Planner.FgOutput(api, dyn ? 2 : mult, out cap, out label);
             int eff = Math.Min(mult, cap);
+            int maxCap;
+            string maxLabel;
+            Planner.FgOutput(api, 6, out maxCap, out maxLabel);
+            maxCap = Math.Max(maxCap, cap);
             timeline.Set(dyn ? 4 : eff, dyn);
             if (dyn) lblFgFps.Text = L.T("Dinâmico: 2X a 6X conforme o Hz do monitor");
             else if (mult == 1) lblFgFps.Text = L.T("Desligado — só quadros reais");
@@ -966,12 +978,12 @@ namespace Dlss5Injector
 
             bool nvAi = label.StartsWith("NVIDIA");
             rowFgOut.Set(nvAi ? Theme.GCheck : Theme.GInfo, nvAi ? Theme.Accent : Theme.Warn, label);
-            rowFgMax.Set(cap >= 6 ? Theme.GCheck : Theme.GInfo, cap >= 6 ? Theme.Accent : Theme.Info,
-                cap + "X" + (Gpu.Series == 40 ? L.T("  (3X–4X: desbloqueio experimental)") : Gpu.Series == 30 || Gpu.Series == 20 ? L.T("  (experimental)") : ""));
+            rowFgMax.Set(maxCap >= 6 ? Theme.GCheck : Theme.GInfo, maxCap >= 6 ? Theme.Accent : Theme.Info,
+                maxCap + "X" + (Gpu.IsNvidia && Gpu.Series == 40 && maxCap > 2 ? L.T("  (3X–4X via XeSS-FG)") : Gpu.Series == 30 || Gpu.Series == 20 ? L.T("  (experimental)") : ""));
             rowFgVec.Set(Theme.GCheck, Theme.Accent, L.T("Usa os vetores de movimento do jogo"));
             rowFgFlow.Set(Theme.GCheck, Theme.Accent, L.T("Liberado pelo OptiScaler F5"));
             if (Gpu.IsNvidia && Gpu.Series >= 50) rowFgMod.Set(Theme.GCheck, Theme.Accent, L.T("Nenhum — suporte nativo"));
-            else if (Gpu.IsNvidia && Gpu.Series == 40) rowFgMod.Set(Theme.GCheck, Theme.Accent, L.T("Desbloqueio MFG embutido no OptiScaler F5"));
+            else if (Gpu.IsNvidia && Gpu.Series == 40) rowFgMod.Set(Theme.GCheck, Theme.Accent, L.T("Nenhum — XeSS-FG incluso no OptiScaler F5"));
             else if (Gpu.IsNvidia && Gpu.Series >= 20)
             {
                 bool cached = Directory.Exists(Path.Combine(AppPaths.Cache, "dlssg_for_sm86"));
@@ -983,7 +995,7 @@ namespace Dlss5Injector
 
             StatusRow mine = Gpu.Series >= 50 ? rowGen50 : Gpu.Series == 40 ? rowGen40 : Gpu.Series >= 20 ? rowGen30 : null;
             rowGen50.Set(mine == rowGen50 ? Theme.GCheck : Theme.GChip, mine == rowGen50 ? Theme.Accent : Theme.Muted, L.T("Até 6X · dinâmico") + (mine == rowGen50 ? L.T(" · sua GPU") : ""));
-            rowGen40.Set(mine == rowGen40 ? Theme.GCheck : Theme.GChip, mine == rowGen40 ? Theme.Accent : Theme.Muted, L.T("Até 4X (desbloqueio)") + (mine == rowGen40 ? L.T(" · sua GPU") : ""));
+            rowGen40.Set(mine == rowGen40 ? Theme.GCheck : Theme.GChip, mine == rowGen40 ? Theme.Accent : Theme.Muted, L.T("2X DLSS-G · 4X XeSS-FG") + (mine == rowGen40 ? L.T(" · sua GPU") : ""));
             rowGen30.Set(mine == rowGen30 ? Theme.GCheck : Theme.GChip, mine == rowGen30 ? Theme.Accent : Theme.Muted, L.T("Até 4X (dlssg_for_sm86)") + (mine == rowGen30 ? L.T(" · sua GPU") : ""));
 
             lblFgGame.Text = game == null
@@ -1305,7 +1317,7 @@ namespace Dlss5Injector
         {
             using (OpenFileDialog d = new OpenFileDialog())
             {
-                d.Filter = "nvngx_dlssnr.dll|nvngx_dlssnr.dll|DLL|*.dll";
+                d.Filter = L.T("Runtime do DLSS 5 (nvngx_dlssnr.dll ou .zip)") + "|nvngx_dlssnr.dll;*.zip|DLL|*.dll|ZIP|*.zip";
                 d.Title = L.T("Selecione a runtime do DLSS 5 (nvngx_dlssnr.dll)");
                 if (d.ShowDialog(this) == DialogResult.OK && AcceptNrFile(d.FileName)) SetNr(d.FileName, true);
             }
@@ -1374,14 +1386,17 @@ namespace Dlss5Injector
             {
                 string dest = null;
                 Exception err = null;
-                try { dest = NrRuntime.Import(src, AppPaths.Components); } catch (Exception ex) { err = ex; }
+                bool zip = src.EndsWith(".zip", StringComparison.OrdinalIgnoreCase);
+                try { dest = NrRuntime.ImportAny(src, AppPaths.Components); } catch (Exception ex) { err = ex; }
                 SafeInvoke(delegate
                 {
                     importingNr = false;
                     if (err != null)
                     {
                         Log(L.T("Não foi possível copiar para a pasta do app: ") + err.Message);
-                        UseNr(src, manual);   // continua usando o original
+                        // Do zip não dá para usar o original: volta para a runtime que já existia (se houver)
+                        UseNr(zip ? NrRuntime.FindCandidate(slDir, AppPaths.Components) : src, manual);
+                        if (zip) MessageBox.Show(this, err.Message, Program.AppName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         return;
                     }
                     Log(L.T("Runtime do DLSS 5 copiada para a pasta do app: ") + dest);
@@ -1441,9 +1456,9 @@ namespace Dlss5Injector
             drop.Invalidate();
             string[] f = (string[])e.Data.GetData(DataFormats.FileDrop);
             if (f == null || f.Length == 0) return;
-            if (File.Exists(f[0]) && f[0].EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+            if (File.Exists(f[0]) && (f[0].EndsWith(".dll", StringComparison.OrdinalIgnoreCase) || f[0].EndsWith(".zip", StringComparison.OrdinalIgnoreCase)))
             {
-                // Arrastar a runtime (nvngx_dlssnr.dll) para a janela
+                // Arrastar a runtime (nvngx_dlssnr.dll ou um zip com ela) para a janela
                 if (AcceptNrFile(f[0])) { SetNr(f[0], true); Log(L.T("Runtime do DLSS 5 encontrada: ") + f[0]); }
                 return;
             }
@@ -1589,6 +1604,7 @@ namespace Dlss5Injector
             o.Log = tgLog.Checked;
             o.Passes = segPasses.Selected + 1;
             o.RunBeforeSR = tgBefore.Checked;
+            o.Hdr = tgHdr.Checked;
             return o;
         }
 
@@ -1614,6 +1630,7 @@ namespace Dlss5Injector
             tgBefore.Enabled = opti && game.HasUpscaler && p.Method == Method.Opti;
             segPasses.Enabled = opti;
             tgLog.Enabled = opti;
+            tgHdr.Enabled = opti && p.Method != Method.DxvkOpti && p.Api != GfxApi.Vulkan;
 
             string header = Planner.Name(p.Method) + "  ·  " + Planner.ApiName(p.Api);
             if (cmbMethod.SelectedIndex == 0 && !string.IsNullOrEmpty(methodWhy)) header += L.T("\r\n") + methodWhy;

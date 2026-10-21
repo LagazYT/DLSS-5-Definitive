@@ -3,6 +3,8 @@ rem Compila o DLSS 5 Definitive com o compilador C# que ja vem no Windows (.NET 
 rem   DLSS 5 Definitive.exe                  (o app)
 rem   dist\DLSS 5 Definitive Setup.exe       (instalador com desinstalador)
 rem   dist\DLSS 5 Definitive Portable.zip    (versao portable: dados em .\Data)
+rem Opcional: build.bat "C:\caminho\DLL DLSS 5.zip" gera tambem dist\privado\DLSS 5 Definitive Setup (com runtime).exe,
+rem um instalador com o zip da runtime embutido (so para uso proprio: NAO publique, o arquivo e da NVIDIA).
 setlocal
 set CSC=%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\csc.exe
 if not exist "%CSC%" set CSC=%WINDIR%\Microsoft.NET\Framework\v4.0.30319\csc.exe
@@ -31,3 +33,12 @@ powershell -NoProfile -Command "Compress-Archive -Path '%P%' -DestinationPath 'd
 if errorlevel 1 (echo FALHOU: zip portable & exit /b 1)
 rmdir /s /q "%P%"
 echo OK: dist\DLSS 5 Definitive Portable.zip
+
+if "%~1"=="" exit /b 0
+if not exist "%~1" (echo FALHOU: zip da runtime nao encontrado: %~1 & exit /b 1)
+if not exist "dist\privado" mkdir "dist\privado"
+"%CSC%" /nologo /target:winexe /platform:anycpu /optimize+ /codepage:65001 /out:"dist\privado\DLSS 5 Definitive Setup (com runtime).exe" /win32manifest:setup\setup.manifest /win32icon:app.ico %REFS% ^
+  "/resource:DLSS 5 Definitive.exe,app.exe" "/resource:LEIA-ME.txt,readme.txt" "/resource:%~1,runtime.zip" ^
+  setup\Setup.cs src\Lang.cs src\Common.cs src\Ui.cs src\Library.cs src\Installer.cs src\Downloader.cs src\Planner.cs src\GameScanner.cs src\RuntimeProvider.cs
+if errorlevel 1 (echo FALHOU: instalador com runtime & exit /b 1)
+echo OK: dist\privado\DLSS 5 Definitive Setup (com runtime).exe

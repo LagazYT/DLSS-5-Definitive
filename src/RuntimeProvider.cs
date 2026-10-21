@@ -140,6 +140,14 @@ namespace Dlss5Injector
         /// <summary>Download oficial (se houver) → jogos instalados. Copia o achado para destDir e devolve o caminho (ou null).</summary>
         public static string Obtain(string destDir, Action<string> status)
         {
+            // Zip com a runtime (ex.: "DLL DLSS 5.zip") na pasta do app, em Downloads ou na Área de Trabalho
+            string zip = NrRuntime.FindZip(AppDomain.CurrentDomain.BaseDirectory, destDir, Util.Downloads,
+                Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory));
+            if (zip != null)
+            {
+                if (status != null) status(L.T("Extraindo a runtime do DLSS 5 do zip: ") + zip);
+                try { return NrRuntime.ExtractFromZip(zip, destDir); } catch (Exception ex) { if (status != null) status(ex.Message); }
+            }
             string got = TryOfficialDownload(destDir, status);
             if (got != null) return got;
             string inGame = FindInGames(status);

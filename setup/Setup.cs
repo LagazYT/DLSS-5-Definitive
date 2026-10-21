@@ -17,7 +17,7 @@ namespace Dlss5Setup
     static class SetupApp
     {
         public const string AppName = "DLSS 5 Definitive";
-        public const string Version = "2.2.2";
+        public const string Version = "2.3";
         public const string Author = "Lagaz";
         public const string ExeName = "DLSS 5 Definitive.exe";
         public const string UninstName = "Desinstalar.exe";
@@ -56,10 +56,18 @@ namespace Dlss5Setup
             status(L.T("Copiando arquivos..."), 35);
             Extract("readme.txt", Path.Combine(target, "LEIA-ME.txt"));
             string comp = Path.Combine(target, "components");
-            if (!string.IsNullOrEmpty(nrSrc) && NrRuntime.IsRuntimeFile(nrSrc))
+            if (HasEmbeddedRuntime)
+            {
+                // Instalador montado com o zip da runtime: o zip fica na pasta de instalação e a dll vai para components
+                status(L.T("Copiando a runtime do DLSS 5..."), 40);
+                string zip = Path.Combine(target, RuntimeZipName);
+                if (!File.Exists(zip) || new FileInfo(zip).Length != EmbeddedRuntimeLength) Extract(RuntimeResource, zip);
+                try { NrRuntime.ExtractFromZip(zip, comp); nrSrc = null; } catch { }
+            }
+            if (!string.IsNullOrEmpty(nrSrc) && NrRuntime.IsRuntimeSource(nrSrc))
             {
                 status(L.T("Copiando a runtime do DLSS 5..."), 45);
-                NrRuntime.Import(nrSrc, comp);
+                try { NrRuntime.ImportAny(nrSrc, comp); } catch { }
             }
             if (Installer.IsStreamlineDir(slSrc))
             {
@@ -106,7 +114,16 @@ namespace Dlss5Setup
             string s = null;
             try { s = Settings.Get("nr"); } catch { }
             if (!string.IsNullOrEmpty(s) && NrRuntime.IsRuntimeFile(s)) return s;
-            try { return NrRuntime.FindCandidate(null, Path.Combine(DataDir, "components")); } catch { return null; }
+            string found = null;
+            try { found = NrRuntime.FindCandidate(null, Path.Combine(DataDir, "components")); } catch { }
+            if (found != null) return found;
+            // Zip com a runtime ao lado do instalador, na pasta de instalação, em Downloads ou na Área de Trabalho
+            try
+            {
+                return NrRuntime.FindZip(Path.GetDirectoryName(Application.ExecutablePath), target, Util.Downloads,
+                    Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory));
+            }
+            catch { return null; }
         }
 
         /// <summary>Streamline SDK neste PC: o já instalado, o usado pelo app antes, uma pasta streamline-sdk* em Downloads ou o já baixado.</summary>
@@ -181,6 +198,24 @@ namespace Dlss5Setup
                 catch { }
             }
             return true;
+        }
+
+        public const string RuntimeResource = "runtime.zip";
+        public const string RuntimeZipName = "DLL DLSS 5.zip";
+
+        /// <summary>true quando o instalador foi montado com o zip da runtime (build.bat "caminho\DLL DLSS 5.zip").</summary>
+        public static bool HasEmbeddedRuntime
+        {
+            get { return EmbeddedRuntimeLength > 0; }
+        }
+
+        public static long EmbeddedRuntimeLength
+        {
+            get
+            {
+                using (Stream s = Assembly.GetExecutingAssembly().GetManifestResourceStream(RuntimeResource))
+                    return s == null ? 0 : s.Length;
+            }
         }
 
         public static void Extract(string resource, string dest)
@@ -401,7 +436,9 @@ namespace Dlss5Setup
         {
             if (nrSrc == null || !File.Exists(nrSrc)) nrSrc = SetupApp.FindNrSource(dir);
             slSrc = SetupApp.FindSlSource(dir);
-            if (nrSrc != null)
+            if (SetupApp.HasEmbeddedRuntime)
+                rowNr.Set(Theme.GCheck, Theme.Accent, L.T("Incluída neste instalador — vai para a pasta do app (") + SetupApp.RuntimeZipName + ")");
+            else if (nrSrc != null)
                 rowNr.Set(Theme.GCheck, Theme.Accent, L.T("Encontrada — será copiada para a pasta do app: ") + nrSrc);
             else if (!searchedGames)
                 SearchGames();
@@ -453,10 +490,10 @@ namespace Dlss5Setup
         {
             using (OpenFileDialog d = new OpenFileDialog())
             {
-                d.Filter = "nvngx_dlssnr.dll|nvngx_dlssnr.dll|DLL|*.dll";
+                d.Filter = L.T("Runtime do DLSS 5 (nvngx_dlssnr.dll ou .zip)") + "|nvngx_dlssnr.dll;*.zip|DLL|*.dll|ZIP|*.zip";
                 d.Title = L.T("Selecione a runtime do DLSS 5 (nvngx_dlssnr.dll)");
                 if (d.ShowDialog(this) != DialogResult.OK) return;
-                if (!NrRuntime.IsRuntimeFile(d.FileName))
+                if (!NrRuntime.IsRuntimeSource(d.FileName))
                 {
                     MessageBox.Show(this, L.T("Este arquivo não é a runtime do DLSS 5.") + "\r\n\r\n" +
                         L.T("O nvngx.dll_dlssnr.dll é o \"forwarder\" que já vem dentro do OptiScaler F5 — o app instala ele sozinho. ") +
