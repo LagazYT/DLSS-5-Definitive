@@ -10,7 +10,7 @@ namespace Dlss5Injector
     {
         public const string AppName = "DLSS 5 Definitive";
         public const string Author = "Lagaz";
-        public const string Version = "2.3";
+        public const string Version = "2.4";
 
         [STAThread]
         static void Main(string[] args)
@@ -40,8 +40,42 @@ namespace Dlss5Injector
                 catch (Exception ex) { Report(ex, false); }
                 return;
             }
+            StartMinimized = Array.Exists(args, a => a.Equals("/minimized", StringComparison.OrdinalIgnoreCase));
+
+            // Uma janela só: se o app já está aberto (talvez escondido na bandeja), pede para ele aparecer e sai.
+            // Ao reiniciar (atualização, administrador) a cópia antiga ainda pode estar fechando: espera um pouco.
+            bool restart = updated || folder != null;
+            Mutex single = new Mutex(false, @"Local\DLSS5Definitive.Single");
+            bool owner;
+            try { owner = single.WaitOne(restart ? 5000 : 0); }
+            catch (AbandonedMutexException) { owner = true; }
+            EventWaitHandle show = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\DLSS5Definitive.Show");
+            if (!owner)
+            {
+                show.Set();
+                return;
+            }
+            Thread listen = new Thread(delegate()
+            {
+                while (true)
+                {
+                    show.WaitOne();
+                    Action h = ShowRequested;
+                    if (h != null) h();
+                }
+            });
+            listen.IsBackground = true;
+            listen.Start();
+
             Application.Run(new MainForm(folder, updated));
+            GC.KeepAlive(single);
         }
+
+        /// <summary>Aberto com /minimized (inicialização com o Windows).</summary>
+        public static bool StartMinimized;
+
+        /// <summary>Outra cópia do app foi aberta: mostrar esta janela.</summary>
+        public static event Action ShowRequested;
 
         public static string CrashLog { get { return Path.Combine(AppPaths.Root, "crash.log"); } }
 

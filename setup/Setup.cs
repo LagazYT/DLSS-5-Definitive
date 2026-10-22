@@ -17,7 +17,7 @@ namespace Dlss5Setup
     static class SetupApp
     {
         public const string AppName = "DLSS 5 Definitive";
-        public const string Version = "2.3";
+        public const string Version = "2.4";
         public const string Author = "Lagaz";
         public const string ExeName = "DLSS 5 Definitive.exe";
         public const string UninstName = "Desinstalar.exe";
@@ -668,6 +668,16 @@ namespace Dlss5Setup
             foreach (string l in new[] { SetupApp.StartMenuLnk, SetupApp.DesktopLnk })
                 if (File.Exists(l)) File.Delete(l);
             Registry.CurrentUser.DeleteSubKeyTree(SetupApp.RegPath, false);
+            try
+            {
+                // "Iniciar com o Windows"
+                using (RegistryKey run = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run", true))
+                {
+                    string v = run == null ? null : run.GetValue("DLSS5Definitive") as string;
+                    if (v != null && v.IndexOf(dir, StringComparison.OrdinalIgnoreCase) >= 0) run.DeleteValue("DLSS5Definitive", false);
+                }
+            }
+            catch { }
             foreach (string f in new[] { SetupApp.ExeName, "LEIA-ME.txt" })
             {
                 string p = Path.Combine(dir, f);

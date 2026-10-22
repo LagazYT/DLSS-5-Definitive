@@ -28,6 +28,12 @@ Runtime do DLSS 5
   Um .zip com o nvngx_dlssnr.dll dentro também serve: arraste para a janela, escolha em Alterar ou
   deixe ao lado do instalador. A dll é extraída para a pasta components do app.
 
+Sem a runtime, o botão "Pasta do app" abre a pasta de instalação do app para escolher o zip.
+
+Configurações > Sistema
+  Minimizar para a bandeja ao fechar (o X esconde; botão direito no ícone > Sair) e
+  Iniciar com o Windows (abre minimizado).
+
 Saída HDR (Injetor)
   Liga o HDR do OptiScaler F5 (DX11/DX12; ative o HDR do Windows). Não funciona com o DLSS Frame Generation.
 

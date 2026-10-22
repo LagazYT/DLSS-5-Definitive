@@ -85,6 +85,11 @@ Também vale um **.zip com o `nvngx_dlssnr.dll` dentro**: arraste o zip para a j
 
 Para uso próprio, `build.bat "C:\caminho\DLL DLSS 5.zip"` gera também `dist\privado\DLSS 5 Definitive Setup (com runtime).exe`, um instalador com o zip embutido que deixa o zip na pasta de instalação. Não publique esse instalador: o arquivo é da NVIDIA.
 
+Sem a runtime, aparece o botão **Pasta do app**, que abre a pasta de instalação do app para escolher o zip (o **Alterar** continua lá).
+
+### Bandeja e inicialização
+Em **Configurações > Sistema**: **Minimizar para a bandeja ao fechar** (o X esconde a janela; botão direito no ícone > Sair) e **Iniciar com o Windows** (abre minimizado). Abrir o app de novo traz a janela que já está aberta.
+
 ### Saída HDR
 A opção **Saída HDR (DX11/DX12)** do Injetor liga o `[HDR]` do OptiScaler F5 0.1.33 (ative também o HDR do Windows). Não funciona em Vulkan/DXVK nem junto com o DLSS Frame Generation.
 

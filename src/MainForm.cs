@@ -38,7 +38,10 @@ namespace Dlss5Injector
         ModernButton btnFgLink;
         Segmented segPasses;
         StatusRow rowSl, rowNr;
-        ModernButton btnSl, btnNr, btnInstall, btnUninstall, btnOpen;
+        ModernButton btnSl, btnNr, btnInstall, btnUninstall, btnOpen, btnNrApp, btnNrAppCfg;
+        ToggleSwitch tgTray, tgStartup;
+        NotifyIcon tray;
+        bool exiting, trayTipShown;
         StepsView steps;
         ThinProgress bar;
         TextBox txtLog;
@@ -157,7 +160,27 @@ namespace Dlss5Injector
                 };
                 updTimer.Start();
             };
-            FormClosing += delegate { if (scanner != null) scanner.Cancel = true; LibraryStore.Save(games); };
+            BuildTray();
+            if (Program.StartMinimized)
+            {
+                // Aberto pelo Windows ao entrar: já começa minimizado (ou só na bandeja)
+                WindowState = FormWindowState.Minimized;
+                Shown += delegate { if (Settings.Get("trayOnClose") == "1") HideToTray(false); };
+            }
+            FixStartupPath();
+            Program.ShowRequested += delegate { SafeInvoke(RestoreFromTray); };
+            FormClosing += delegate(object s, FormClosingEventArgs e)
+            {
+                if (!exiting && e.CloseReason == CloseReason.UserClosing && Settings.Get("trayOnClose") == "1")
+                {
+                    e.Cancel = true;
+                    HideToTray(true);
+                    return;
+                }
+                if (scanner != null) scanner.Cancel = true;
+                LibraryStore.Save(games);
+            };
+            FormClosed += delegate { if (tray != null) { tray.Visible = false; tray.Dispose(); } };
 
             // Se a runtime do DLSS 5 ou o Streamline aparecerem depois que o app abriu (copiados/extraídos em
             // Downloads, por exemplo), detecta sozinho — sem precisar reabrir o app.
@@ -848,6 +871,11 @@ namespace Dlss5Injector
             btnNr.SetBounds(430, 328, 82, 30);
             btnNr.Click += delegate { BrowseNr(); };
             cCfg.Controls.Add(btnNr);
+            btnNrApp = new ModernButton(L.T("Pasta do app"), null, ButtonKind.Ghost);
+            btnNrApp.SetBounds(318, 328, 108, 30);
+            btnNrApp.Click += delegate { BrowseNrInAppFolder(); };
+            btnNrApp.Visible = false;
+            cCfg.Controls.Add(btnNrApp);
 
             Card cPlan = AddCard(P, "4", L.T("Plano de instalação"), 568, 466 - o, 528, 262);
             steps = new StepsView();
@@ -1137,6 +1165,94 @@ namespace Dlss5Injector
         {
             rowNr.Set(glyph, accent, text);
             if (rowNrCfg != null) rowNrCfg.Set(glyph, accent, text);
+            // Sem a runtime: mostra o botão que abre a pasta de instalação do app (onde fica o zip da runtime)
+            bool missing = string.IsNullOrEmpty(nrPath) || !File.Exists(nrPath);
+            if (btnNrApp != null) { btnNrApp.Visible = missing; rowNr.Width = missing ? 296 : 400; }
+            if (btnNrAppCfg != null && rowNrCfg != null) { btnNrAppCfg.Visible = missing; rowNrCfg.Width = missing ? 296 : 400; }
+        }
+
+        // ================================================================ bandeja e inicialização com o Windows
+
+        const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
+        const string RunName = "DLSS5Definitive";
+
+        static bool StartupEnabled()
+        {
+            try
+            {
+                using (Microsoft.Win32.RegistryKey k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(RunKey))
+                    return k != null && k.GetValue(RunName) != null;
+            }
+            catch { return false; }
+        }
+
+        static void SetStartup(bool on)
+        {
+            using (Microsoft.Win32.RegistryKey k = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(RunKey))
+            {
+                if (on) k.SetValue(RunName, "\"" + Application.ExecutablePath + "\" /minimized");
+                else k.DeleteValue(RunName, false);
+            }
+        }
+
+        /// <summary>Se o exe registrado para iniciar com o Windows não existe mais (app mudou de pasta), aponta para este.</summary>
+        static void FixStartupPath()
+        {
+            try
+            {
+                string v;
+                using (Microsoft.Win32.RegistryKey k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(RunKey))
+                    v = k == null ? null : k.GetValue(RunName) as string;
+                if (string.IsNullOrEmpty(v)) return;
+                int q = v.IndexOf('"', 1);
+                string exe = v.StartsWith("\"") && q > 0 ? v.Substring(1, q - 1) : v;
+                if (!File.Exists(exe)) SetStartup(true);
+            }
+            catch { }
+        }
+
+        void BuildTray()
+        {
+            tray = new NotifyIcon();
+            tray.Icon = Icon;
+            tray.Text = Program.AppName;
+            ContextMenuStrip m = new ContextMenuStrip();
+            m.Items.Add(L.T("Abrir"), null, delegate { RestoreFromTray(); });
+            m.Items.Add(L.T("Sair"), null, delegate { exiting = true; Close(); });
+            tray.ContextMenuStrip = m;
+            tray.MouseClick += delegate(object s, MouseEventArgs e) { if (e.Button == MouseButtons.Left) RestoreFromTray(); };
+            tray.Visible = Settings.Get("trayOnClose") == "1";
+        }
+
+        void HideToTray(bool tip)
+        {
+            tray.Visible = true;
+            Hide();
+            if (tip && !trayTipShown)
+            {
+                trayTipShown = true;
+                tray.ShowBalloonTip(3000, Program.AppName, L.T("Continua aberto aqui. Clique no ícone para abrir; botão direito → Sair para fechar."), ToolTipIcon.Info);
+            }
+        }
+
+        void RestoreFromTray()
+        {
+            Show();
+            if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
+            Activate();
+            tray.Visible = Settings.Get("trayOnClose") == "1";
+        }
+
+        /// <summary>Escolher a runtime (zip ou dll) começando na pasta de instalação do app.</summary>
+        void BrowseNrInAppFolder()
+        {
+            using (OpenFileDialog d = new OpenFileDialog())
+            {
+                d.InitialDirectory = AppDomain.CurrentDomain.BaseDirectory;
+                d.Filter = L.T("Runtime do DLSS 5 (nvngx_dlssnr.dll ou .zip)") + "|*.zip;nvngx_dlssnr.dll|ZIP|*.zip|DLL|*.dll";
+                d.Title = L.T("Selecione o zip da runtime do DLSS 5 na pasta do app");
+                if (d.ShowDialog(this) == DialogResult.OK && AcceptNrFile(d.FileName)) SetNr(d.FileName, true);
+            }
         }
 
         // ================================================================ CONFIGURAÇÕES
@@ -1188,6 +1304,11 @@ namespace Dlss5Injector
             b2.SetBounds(430, 118, 82, 30);
             b2.Click += delegate { BrowseNr(); };
             cFiles.Controls.Add(b2);
+            btnNrAppCfg = new ModernButton(L.T("Pasta do app"), null, ButtonKind.Ghost);
+            btnNrAppCfg.SetBounds(318, 118, 108, 30);
+            btnNrAppCfg.Click += delegate { BrowseNrInAppFolder(); };
+            btnNrAppCfg.Visible = false;
+            cFiles.Controls.Add(btnNrAppCfg);
             Label lblComp = TextLabel(cFiles, L.T("Guardados na pasta do app: ") + AppPaths.Components, 18, 160, 492, 30, Theme.F(8f), Theme.Dim);
             lblComp.AutoEllipsis = true;
 
@@ -1204,20 +1325,39 @@ namespace Dlss5Injector
             bClear.Click += delegate { ClearDownloads(); };
             cData.Controls.Add(bClear);
 
+            // ---- Sistema: bandeja e inicialização com o Windows
+            Card cSys = AddCard(P, null, L.T("Sistema"), 24, 444, 528, 244);
+            tgTray = Toggle(cSys, L.T("Minimizar para a bandeja ao fechar"), Settings.Get("trayOnClose") == "1", 16, 52, 496);
+            TextLabel(cSys, L.T("O X esconde a janela e o app fica no ícone perto do relógio. Para sair de vez, clique com o botão direito no ícone → Sair."),
+                18, 86, 492, 40, Theme.F(8.5f), Theme.Muted);
+            tgStartup = Toggle(cSys, L.T("Iniciar com o Windows (minimizado)"), StartupEnabled(), 16, 140, 496);
+            TextLabel(cSys, L.T("Abre sozinho quando você entra no Windows, já minimizado (na bandeja, se a opção acima estiver ligada)."),
+                18, 174, 492, 40, Theme.F(8.5f), Theme.Muted);
+            tgTray.CheckedChanged += delegate
+            {
+                Settings.Set("trayOnClose", tgTray.Checked ? "1" : "0");
+                if (tray != null) tray.Visible = tgTray.Checked || !Visible;
+            };
+            tgStartup.CheckedChanged += delegate
+            {
+                try { SetStartup(tgStartup.Checked); }
+                catch (Exception ex) { Log(L.T("Não foi possível alterar a inicialização com o Windows: ") + ex.Message); }
+            };
+
             // ---- Sobre
-            Card cAbout = AddCard(P, null, L.T("Sobre"), 24, 444, 1072, 220);
+            Card cAbout = AddCard(P, null, L.T("Sobre"), 568, 444, 528, 244);
             TextLabel(cAbout, Program.AppName + "  " + Program.Version + "  —  " + L.T("criado por") + " " + Program.Author,
-                18, 48, 1036, 28, Theme.F(12f, FontStyle.Bold), Theme.Accent);
+                18, 48, 492, 28, Theme.F(12f, FontStyle.Bold), Theme.Accent);
             TextLabel(cAbout, L.T("DLSS 5 Neural Rendering e Multi Frame Generation por IA para DX12, DX11, Vulkan, DX10 e DX9."),
-                18, 80, 1036, 24, Theme.F(9.5f), Theme.Text);
+                18, 80, 492, 40, Theme.F(9.5f), Theme.Text);
             TextLabel(cAbout, L.T("Componentes de terceiros: OptiScaler F5 (janblade), NVIDIA Streamline, dlssg_for_sm86 (sdli1995), RenoDX, ReShade, DXVK e dgVoodoo2 — cada um com a própria licença."),
-                18, 108, 1036, 40, Theme.F(9f), Theme.Muted);
+                18, 124, 492, 56, Theme.F(9f), Theme.Muted);
             ModernButton bGit = new ModernButton(L.T("  Página no GitHub"), Theme.GOpen, ButtonKind.Secondary);
-            bGit.SetBounds(16, 160, 220, 40);
+            bGit.SetBounds(16, 188, 220, 40);
             bGit.Click += delegate { Process.Start("https://github.com/" + Updater.Repo); };
             cAbout.Controls.Add(bGit);
             ModernButton bLic = new ModernButton(L.T("  Créditos e licenças"), Theme.GInfo, ButtonKind.Secondary);
-            bLic.SetBounds(248, 160, 240, 40);
+            bLic.SetBounds(248, 188, 264, 40);
             bLic.Click += delegate { Process.Start("https://github.com/" + Updater.Repo + "#créditos"); };
             cAbout.Controls.Add(bLic);
         }
@@ -1673,7 +1813,13 @@ namespace Dlss5Injector
                         return;
                     }
                     tabs.Selected = 1;
-                    MessageBox.Show(this, NrMissingText(), Program.AppName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    // Primeiro oferece a pasta de instalação do app (onde fica o zip da runtime); "Não" deixa o Alterar de sempre
+                    DialogResult r = MessageBox.Show(this, NrMissingText() + "\r\n\r\n" +
+                        L.T("Abrir a pasta de instalação do app para escolher o zip da runtime (ex.: DLL DLSS 5.zip)?") + "\r\n" +
+                        L.T("Sim = pasta do app   ·   Não = Alterar (escolher em outro lugar)"),
+                        Program.AppName, MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning);
+                    if (r == DialogResult.Yes) BrowseNrInAppFolder();
+                    else if (r == DialogResult.No) BrowseNr();
                 });
                 return;
             }
@@ -1688,6 +1834,7 @@ namespace Dlss5Injector
                         psi.Verb = "runas";
                         psi.UseShellExecute = true;
                         Process.Start(psi);
+                        exiting = true;
                         Close();
                     }
                     catch { }
